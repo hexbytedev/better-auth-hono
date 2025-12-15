@@ -1,0 +1,32 @@
+{
+    "$schema": "https://biomejs.dev/schemas/2.2.3/schema.json",
+    "files": {
+        "ignoreUnknown": true,
+        "maxSize": 5242880
+    },
+    "linter": {
+        "enabled": true,
+        "rules": {
+            "style": {
+                "noNonNullAssertion": "off"
+            },
+            "correctness": {
+                "noUnusedFunctionParameters": "off"
+            },
+            "suspicious": {
+                "noExplicitAny": "off"
+            }
+        }
+    },
+    "formatter": {
+        "enabled": true,
+        "indentStyle": "tab",
+        "lineWidth": 100
+    },
+    "javascript": {
+        "formatter": {
+            "quoteStyle": "double",
+            "semicolons": "always"
+        }
+    }
+}
