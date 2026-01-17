@@ -11,21 +11,50 @@ import * as schema from "./db/schema";
 import { sendPasswordResetEmail, sendVerificationEmail } from "./lib/email";
 
 const allowedOrigins = getAllowedOrigins();
-const SERVER_URL = process.env.BETTER_AUTH_SERVER_URL;
+
+const SERVER_URL = process.env.BETTER_AUTH_SERVER_URL?.trim();
+if (!SERVER_URL) throw new Error("BETTER_AUTH_SERVER_URL is missing");
+
+const BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET?.trim();
+if (!BETTER_AUTH_SECRET) throw new Error("BETTER_AUTH_SECRET is missing");
+
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID?.trim();
+if (!GOOGLE_CLIENT_ID) throw new Error("GOOGLE_CLIENT_ID is missing");
+
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET?.trim();
+if (!GOOGLE_CLIENT_SECRET) throw new Error("GOOGLE_CLIENT_SECRET is missing");
+
+const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID?.trim();
+if (!GITHUB_CLIENT_ID) throw new Error("GITHUB_CLIENT_ID is missing");
+
+const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET?.trim();
+if (!GITHUB_CLIENT_SECRET) throw new Error("GITHUB_CLIENT_SECRET is missing");
+
+const BETTER_AUTH_RP_ID = process.env.BETTER_AUTH_RP_ID?.trim();
+if (!BETTER_AUTH_RP_ID) throw new Error("BETTER_AUTH_RP_ID is missing");
+
+const BETTER_AUTH_RP_NAME = process.env.BETTER_AUTH_RP_NAME?.trim();
+if (!BETTER_AUTH_RP_NAME) throw new Error("BETTER_AUTH_RP_NAME is missing");
+
+const CLIENT_URL = process.env.CLIENT_URL?.trim();
+if (!CLIENT_URL) throw new Error("CLIENT_URL is missing");
+
+const JWT_EXPIRATION_TIME = process.env.JWT_EXPIRATION_TIME?.trim();
+if (!JWT_EXPIRATION_TIME) throw new Error("JWT_EXPIRATION_TIME is missing");
 
 export const auth = betterAuth({
 	baseURL: SERVER_URL,
 	trustedOrigins: allowedOrigins,
-	secret: process.env.BETTER_AUTH_SECRET || "your-secret-key-here",
+	secret: BETTER_AUTH_SECRET,
 	socialProviders: {
 		google: {
-			clientId: process.env.GOOGLE_CLIENT_ID!,
-			clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+			clientId: GOOGLE_CLIENT_ID,
+			clientSecret: GOOGLE_CLIENT_SECRET,
 			redirectURI: `${SERVER_URL}/api/auth/callback/google`,
 		},
 		github: {
-			clientId: process.env.GITHUB_CLIENT_ID!,
-			clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+			clientId: GITHUB_CLIENT_ID,
+			clientSecret: GITHUB_CLIENT_SECRET,
 			scope: ["read:user", "user:email"],
 			redirectURI: `${SERVER_URL}/api/auth/callback/github`,
 		},
@@ -209,9 +238,9 @@ export const auth = betterAuth({
 					modelName: "passkeys",
 				},
 			},
-			rpID: process.env.BETTER_AUTH_RP_ID || "localhost",
-			rpName: process.env.BETTER_AUTH_RP_NAME || "hexbyte",
-			origin: process.env.CLIENT_URL || "http://localhost:3000",
+			rpID: BETTER_AUTH_RP_ID,
+			rpName: BETTER_AUTH_RP_NAME,
+			origin: CLIENT_URL,
 			authenticatorSelection: {
 				authenticatorAttachment: undefined,
 				residentKey: "preferred",
@@ -233,8 +262,8 @@ export const auth = betterAuth({
 			},
 			jwt: {
 				issuer: SERVER_URL, // Use server URL for issuer
-				audience: process.env.CLIENT_URL || "http://localhost:3000", // Client URL for audience
-				expirationTime: process.env.JWT_EXPIRATION_TIME,
+				audience: CLIENT_URL, // Client URL for audience
+				expirationTime: JWT_EXPIRATION_TIME,
 				definePayload: async (session) => {
 					// Get user data from database
 					const userData = await db.query.users.findFirst({

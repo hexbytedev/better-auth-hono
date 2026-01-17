@@ -1,10 +1,14 @@
 // lib/email.ts
 
-const EMAIL_SERVICE_URL = process.env.EMAIL_SERVICE_API;
+const EMAIL_SERVICE_URL = process.env.EMAIL_SERVICE_API?.trim();
+if (!EMAIL_SERVICE_URL) throw new Error("EMAIL_SERVICE_API is missing");
 
 // --- New Environment Variables for Basic Auth ---
-const EMAIL_SERVICE_USERNAME = process.env.EMAIL_SERVICE_USERNAME;
-const EMAIL_SERVICE_PASSWORD = process.env.EMAIL_SERVICE_PASSWORD;
+const EMAIL_SERVICE_USERNAME = process.env.EMAIL_SERVICE_USERNAME?.trim();
+if (!EMAIL_SERVICE_USERNAME) throw new Error("EMAIL_SERVICE_USERNAME is missing");
+
+const EMAIL_SERVICE_PASSWORD = process.env.EMAIL_SERVICE_PASSWORD?.trim();
+if (!EMAIL_SERVICE_PASSWORD) throw new Error("EMAIL_SERVICE_PASSWORD is missing");
 
 interface User {
 	email: string;
@@ -12,11 +16,6 @@ interface User {
 }
 
 async function sendEmail(endpoint: string, data: any) {
-	// Check for the new Basic Auth credentials
-	if (!EMAIL_SERVICE_USERNAME || !EMAIL_SERVICE_PASSWORD) {
-		throw new Error("EMAIL_SERVICE_USERNAME or EMAIL_SERVICE_PASSWORD is not configured");
-	}
-
 	// Create the Base64 encoded credentials for the Authorization header
 	const credentials = `${EMAIL_SERVICE_USERNAME}:${EMAIL_SERVICE_PASSWORD}`;
 	const encodedCredentials = Buffer.from(credentials).toString("base64");

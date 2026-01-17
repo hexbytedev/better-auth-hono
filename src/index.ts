@@ -1,8 +1,8 @@
 // src/index.ts
 
+import "dotenv/config";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import "dotenv/config";
 import { auth } from "./auth";
 import { getAllowedOrigins, getAppHost, getAppPort, getCorsConfig } from "./config/app.config";
 import usersRoute from "./routes/users.route";
@@ -78,8 +78,8 @@ rootApp.get("/debug-origins", (c) => {
 		corsConfig: getCorsConfig(),
 		appPort: getAppPort(),
 		appHost: getAppHost(),
-		clientUrl: process.env.CLIENT_URL,
-		rawAllowedOrigins: process.env.ALLOWED_ORIGINS,
+		clientUrl: process.env.CLIENT_URL?.trim(),
+		rawAllowedOrigins: process.env.ALLOWED_ORIGINS?.trim(),
 	});
 });
 

@@ -3,7 +3,10 @@ import type { Context, Next } from "hono";
 
 // Get credentials from env and trim whitespace safely
 const AUTH_USER = process.env.API_AUTH_USER?.trim();
+if (!AUTH_USER) throw new Error("API_AUTH_USER is missing");
+
 const AUTH_PASS = process.env.API_AUTH_PASSWORD?.trim();
+if (!AUTH_PASS) throw new Error("API_AUTH_PASSWORD is missing");
 
 /**
  * Validates HTTP Basic Auth (Username & Password)

@@ -18,6 +18,9 @@ const DEFAULT_CORS_CONFIG: CorsConfig = {
 // Default application settings
 const DEFAULT_APP_PORT = 8558;
 
+const CLIENT_URL = process.env.CLIENT_URL?.trim();
+if (!CLIENT_URL) throw new Error("CLIENT_URL is missing");
+
 /**
  * Safely trim a string value, handling undefined/null
  */
@@ -122,13 +125,12 @@ export function getCorsConfig(): CorsConfig {
  * Trims all values to prevent whitespace issues
  */
 export function getAllowedOrigins(): string[] {
-	const clientUrl = safeTrim(process.env.CLIENT_URL);
 	const additionalOrigins = parseCommaSeparated(process.env.ALLOWED_ORIGINS);
 
 	const origins: string[] = [];
 
-	if (clientUrl) {
-		origins.push(clientUrl);
+	if (CLIENT_URL) {
+		origins.push(CLIENT_URL);
 	}
 
 	origins.push(...additionalOrigins);
