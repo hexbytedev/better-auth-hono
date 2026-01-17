@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import type { Context, Next } from "hono";
 
 // Get credentials from env and trim whitespace safely
@@ -57,9 +58,18 @@ export const validateBasicAuth = async (c: Context, next: Next) => {
 		const credentials = Buffer.from(token, "base64").toString("utf-8");
 		const [username, password] = credentials.split(":");
 
-		// Compare with Environment Variables
-		// (Using simple string comparison. For high security finance apps, consider crypto.timingSafeEqual)
-		if (username !== AUTH_USER || password !== AUTH_PASS) {
+		// Compare with Environment Variables safely
+		const safeCompare = (a: string, b: string) => {
+			const bufA = Buffer.from(a ?? "");
+			const bufB = Buffer.from(b ?? "");
+
+			if (bufA.length !== bufB.length) {
+				return false;
+			}
+			return timingSafeEqual(bufA, bufB);
+		};
+
+		if (!safeCompare(username, AUTH_USER) || !safeCompare(password, AUTH_PASS)) {
 			console.warn(
 				`[Security] Failed login attempt for user: "${username}" from IP: ${
 					c.req.header("x-forwarded-for") || "unknown"
