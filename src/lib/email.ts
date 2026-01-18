@@ -1,5 +1,7 @@
 // lib/email.ts
 
+import * as Sentry from "@sentry/bun";
+
 const EMAIL_SERVICE_URL = process.env.EMAIL_SERVICE_API?.trim();
 if (!EMAIL_SERVICE_URL) throw new Error("EMAIL_SERVICE_API is missing");
 
@@ -34,10 +36,19 @@ async function sendEmail(endpoint: string, data: any) {
 	const responseData = await response.json().catch(() => ({}));
 
 	if (!response.ok) {
-		// The error handling remains the same
-		throw new Error(`Failed to send email: ${response.status} ${response.statusText}`, {
-			cause: responseData,
+		const error = new Error(`Failed to send email: ${response.status} ${response.statusText}`);
+
+		// Send to Sentry for monitoring
+		Sentry.captureException(error, {
+			extra: {
+				endpoint,
+				status: response.status,
+				responseData,
+				emailType: endpoint.split('/').pop() // e.g., "verification-email"
+			}
 		});
+
+		throw error;
 	}
 
 	return responseData;

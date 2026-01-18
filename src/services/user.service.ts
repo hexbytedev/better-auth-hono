@@ -1,6 +1,7 @@
 // src/services/user.service.ts
 
 import { eq } from "drizzle-orm";
+import * as Sentry from "@sentry/bun";
 import { db } from "../db";
 import { users } from "../db/schema";
 
@@ -27,6 +28,10 @@ export async function getUserByEmail(email: string) {
 		return user[0] || null;
 	} catch (error) {
 		console.error("Error fetching user by email:", error);
+		// Send to Sentry for monitoring
+		Sentry.captureException(error, {
+			extra: { operation: "getUserByEmail", email }
+		});
 		throw error;
 	}
 }
@@ -54,6 +59,10 @@ export async function getUserById(userId: string) {
 		return user[0] || null;
 	} catch (error) {
 		console.error("Error fetching user by ID:", error);
+		// Send to Sentry for monitoring
+		Sentry.captureException(error, {
+			extra: { operation: "getUserById", userId }
+		});
 		throw error;
 	}
 }

@@ -2,8 +2,8 @@
   "name": "hono-better-auth",
   "version": "1.0.0",
   "scripts": {
-    "dev": "bun --preload ./instrument.ts --hot src/index.ts",
-    "start": "bun --preload ./instrument.ts dist/index.js",
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run dist/index.js",
     "build": "bun build src/index.ts --outdir=dist --target=bun --minify",
     "lint": "biome check --write src",
     "lint:check": "biome check src",

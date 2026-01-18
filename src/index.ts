@@ -1,7 +1,24 @@
 // src/index.ts
 
+// Load environment variables FIRST
 import "dotenv/config";
+
+// Initialize Sentry SECOND
 import * as Sentry from "@sentry/bun";
+
+const SENTRY_DSN = process.env.SENTRY_DSN?.trim();
+if (SENTRY_DSN) {
+	Sentry.init({
+		dsn: SENTRY_DSN,
+		tracesSampleRate: 1.0,
+		sendDefaultPii: true,
+	});
+	console.log("Sentry initialized with DSN:", SENTRY_DSN.substring(0, 20) + "...");
+} else {
+	console.log("No Sentry DSN found");
+}
+
+// Now import everything else
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { auth } from "./auth";
@@ -57,19 +74,15 @@ app.get("/health", (c) => {
 });
 
 // --- Test Sentry Endpoint ---
-app.get("/debug-sentry", (c) => {
+app.get("/test-sentry", (c) => {
 	console.log("Testing Sentry...");
 
-	// Manual error capture like in Bun docs
-	try {
-		throw new Error("Test error for Sentry!");
-	} catch (e) {
-		console.log("Capturing error with Sentry...");
-		// Capture the error manually
-		Sentry.captureException(e);
-		console.log("Error captured, re-throwing...");
-		throw e; // Re-throw so Hono can handle the response
-	}
+	// Manual capture
+	Sentry.captureMessage("Hello from Sentry!");
+	Sentry.captureException(new Error("Test error from Sentry!"));
+
+	// Throw error (should be auto-captured)
+	throw new Error("Thrown error - should be auto-captured!");
 });
 
 // --- Root Endpoint ---

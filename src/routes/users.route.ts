@@ -2,6 +2,7 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
+import * as Sentry from "@sentry/bun";
 import { validateBasicAuth } from "../middleware/api-key.middleware";
 import { getUserByEmail, getUserById } from "../services/user.service";
 
@@ -45,6 +46,10 @@ usersRoute.get("/email/:email", validateBasicAuth, zValidator("param", emailSche
 		});
 	} catch (error) {
 		console.error("Error in /email route:", error);
+		// Send to Sentry for monitoring
+		Sentry.captureException(error, {
+			extra: { route: "/email", email: c.req.param("email") }
+		});
 		return c.json(
 			{
 				success: false,
@@ -85,6 +90,10 @@ usersRoute.get("/id/:id", validateBasicAuth, zValidator("param", userIdSchema), 
 		});
 	} catch (error) {
 		console.error("Error in /id route:", error);
+		// Send to Sentry for monitoring
+		Sentry.captureException(error, {
+			extra: { route: "/id", userId: c.req.param("id") }
+		});
 		return c.json(
 			{
 				success: false,
