@@ -1,6 +1,7 @@
 // src/index.ts
 
 import "dotenv/config";
+import * as Sentry from "@sentry/bun";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { auth } from "./auth";
@@ -45,6 +46,31 @@ app.route("/auth", authApp);
 
 // --- User routes ---
 app.route("/users", usersRoute);
+
+// --- Health Check Endpoint ---
+app.get("/health", (c) => {
+	return c.json({
+		status: "ok",
+		timestamp: new Date().toISOString(),
+		uptime: process.uptime(),
+	});
+});
+
+// --- Test Sentry Endpoint ---
+app.get("/debug-sentry", (c) => {
+	console.log("Testing Sentry...");
+
+	// Manual error capture like in Bun docs
+	try {
+		throw new Error("Test error for Sentry!");
+	} catch (e) {
+		console.log("Capturing error with Sentry...");
+		// Capture the error manually
+		Sentry.captureException(e);
+		console.log("Error captured, re-throwing...");
+		throw e; // Re-throw so Hono can handle the response
+	}
+});
 
 // --- Root Endpoint ---
 const rootApp = new Hono();
