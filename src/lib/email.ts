@@ -38,14 +38,24 @@ async function sendEmail(endpoint: string, data: any) {
 	if (!response.ok) {
 		const error = new Error(`Failed to send email: ${response.status} ${response.statusText}`);
 
-		// Send to Sentry for monitoring
+		// Send to Sentry with email service context
 		Sentry.captureException(error, {
+			tags: {
+				feature: "email-service",
+				operation: "send-email",
+				emailType: endpoint.split("/").pop() || "unknown",
+			},
 			extra: {
 				endpoint,
 				status: response.status,
+				statusText: response.statusText,
 				responseData,
-				emailType: endpoint.split('/').pop() // e.g., "verification-email"
-			}
+				emailServiceUrl: EMAIL_SERVICE_URL,
+				// Don't log sensitive email content, just metadata
+				hasUserData: !!data.user,
+				userEmail: data.user?.email ? `***@${data.user.email.split("@")[1]}` : undefined,
+			},
+			level: "error",
 		});
 
 		throw error;

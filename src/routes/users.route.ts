@@ -1,8 +1,8 @@
 // src/routes/users.route.ts
 import { zValidator } from "@hono/zod-validator";
+import * as Sentry from "@sentry/bun";
 import { Hono } from "hono";
 import { z } from "zod";
-import * as Sentry from "@sentry/bun";
 import { validateBasicAuth } from "../middleware/api-key.middleware";
 import { getUserByEmail, getUserById } from "../services/user.service";
 
@@ -46,10 +46,25 @@ usersRoute.get("/email/:email", validateBasicAuth, zValidator("param", emailSche
 		});
 	} catch (error) {
 		console.error("Error in /email route:", error);
-		// Send to Sentry for monitoring
+
+		// Set user context for Sentry
+		Sentry.setUser({ email: c.req.param("email") });
+
+		// Send to Sentry with rich context
 		Sentry.captureException(error, {
-			extra: { route: "/email", email: c.req.param("email") }
+			tags: {
+				feature: "user-api",
+				route: "get-user-by-email",
+				method: "GET",
+			},
+			extra: {
+				email: c.req.param("email"),
+				userAgent: c.req.header("user-agent"),
+				ip: c.req.header("x-forwarded-for") || "unknown",
+			},
+			level: "error",
 		});
+
 		return c.json(
 			{
 				success: false,
@@ -90,10 +105,25 @@ usersRoute.get("/id/:id", validateBasicAuth, zValidator("param", userIdSchema), 
 		});
 	} catch (error) {
 		console.error("Error in /id route:", error);
-		// Send to Sentry for monitoring
+
+		// Set user context for Sentry
+		Sentry.setUser({ id: c.req.param("id") });
+
+		// Send to Sentry with rich context
 		Sentry.captureException(error, {
-			extra: { route: "/id", userId: c.req.param("id") }
+			tags: {
+				feature: "user-api",
+				route: "get-user-by-id",
+				method: "GET",
+			},
+			extra: {
+				userId: c.req.param("id"),
+				userAgent: c.req.header("user-agent"),
+				ip: c.req.header("x-forwarded-for") || "unknown",
+			},
+			level: "error",
 		});
+
 		return c.json(
 			{
 				success: false,

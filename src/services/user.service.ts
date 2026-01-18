@@ -1,7 +1,7 @@
 // src/services/user.service.ts
 
-import { eq } from "drizzle-orm";
 import * as Sentry from "@sentry/bun";
+import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { users } from "../db/schema";
 
@@ -28,10 +28,22 @@ export async function getUserByEmail(email: string) {
 		return user[0] || null;
 	} catch (error) {
 		console.error("Error fetching user by email:", error);
-		// Send to Sentry for monitoring
+
+		// Send to Sentry with database context
 		Sentry.captureException(error, {
-			extra: { operation: "getUserByEmail", email }
+			tags: {
+				feature: "database",
+				operation: "getUserByEmail",
+				table: "users",
+			},
+			extra: {
+				email,
+				query: "SELECT user by email",
+				database: "postgresql",
+			},
+			level: "error",
 		});
+
 		throw error;
 	}
 }
@@ -59,10 +71,22 @@ export async function getUserById(userId: string) {
 		return user[0] || null;
 	} catch (error) {
 		console.error("Error fetching user by ID:", error);
-		// Send to Sentry for monitoring
+
+		// Send to Sentry with database context
 		Sentry.captureException(error, {
-			extra: { operation: "getUserById", userId }
+			tags: {
+				feature: "database",
+				operation: "getUserById",
+				table: "users",
+			},
+			extra: {
+				userId,
+				query: "SELECT user by ID",
+				database: "postgresql",
+			},
+			level: "error",
 		});
+
 		throw error;
 	}
 }

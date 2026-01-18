@@ -13,7 +13,7 @@ if (SENTRY_DSN) {
 		tracesSampleRate: 1.0,
 		sendDefaultPii: true,
 	});
-	console.log("Sentry initialized with DSN:", SENTRY_DSN.substring(0, 20) + "...");
+	console.log("Sentry initialized with DSN:", `${SENTRY_DSN.substring(0, 20)}...`);
 } else {
 	console.log("No Sentry DSN found");
 }
@@ -71,18 +71,6 @@ app.get("/health", (c) => {
 		timestamp: new Date().toISOString(),
 		uptime: process.uptime(),
 	});
-});
-
-// --- Test Sentry Endpoint ---
-app.get("/test-sentry", (c) => {
-	console.log("Testing Sentry...");
-
-	// Manual capture
-	Sentry.captureMessage("Hello from Sentry!");
-	Sentry.captureException(new Error("Test error from Sentry!"));
-
-	// Throw error (should be auto-captured)
-	throw new Error("Thrown error - should be auto-captured!");
 });
 
 // --- Root Endpoint ---
