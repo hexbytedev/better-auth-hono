@@ -4,6 +4,7 @@ import { passkey } from "@better-auth/passkey";
 import * as Sentry from "@sentry/bun";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { APIError } from "better-auth/api";
 import { createAuthMiddleware, jwt, openAPI, twoFactor } from "better-auth/plugins";
 import { and, eq, ilike, inArray, not, or } from "drizzle-orm";
 import { getAllowedOrigins } from "./config/app.config";
@@ -43,6 +44,9 @@ if (!CLIENT_URL) throw new Error("CLIENT_URL is missing");
 const JWT_EXPIRATION_TIME = process.env.JWT_EXPIRATION_TIME?.trim();
 if (!JWT_EXPIRATION_TIME) throw new Error("JWT_EXPIRATION_TIME is missing");
 
+const FRAUD_CHECK_API_URL = process.env.FRAUD_CHECK_API_URL?.trim();
+if (!FRAUD_CHECK_API_URL) throw new Error("FRAUD_CHECK_API_URL is missing");
+
 export const auth = betterAuth({
 	baseURL: SERVER_URL,
 	trustedOrigins: allowedOrigins,
@@ -61,6 +65,73 @@ export const auth = betterAuth({
 		},
 	},
 	hooks: {
+		before: createAuthMiddleware(async (ctx) => {
+			// Check for email/password signup
+			if (ctx.path === "/sign-up/email" && ctx.method === "POST") {
+				const body = ctx.body;
+				const email = body?.email;
+
+				if (email && typeof email === "string") {
+					try {
+						// Check the full email first
+						const emailResponse = await fetch(
+							`${FRAUD_CHECK_API_URL}/email/${encodeURIComponent(email)}`,
+							{
+								method: "GET",
+								headers: {
+									"User-Agent": "better-auth-app",
+								},
+							},
+						);
+
+						if (emailResponse.status === 200) {
+							// Email is valid, proceed
+							return;
+						}
+
+						// If email check fails, try domain check
+						const domain = email.split("@")[1];
+						if (domain) {
+							const domainResponse = await fetch(
+								`${FRAUD_CHECK_API_URL}/domain/${encodeURIComponent(domain)}`,
+								{
+									method: "GET",
+									headers: {
+										"User-Agent": "better-auth-app",
+									},
+								},
+							);
+
+							if (domainResponse.status === 200) {
+								// Domain is valid, proceed
+								return;
+							}
+						}
+
+						// Both checks failed, reject the signup
+						console.log(`Fraud check failed for email: ${email}`);
+						throw new APIError("BAD_REQUEST", {
+							message: "Email validation failed. Please use a different email address.",
+						});
+					} catch (error) {
+						if (error instanceof APIError) {
+							throw error; // Re-throw API validation errors
+						}
+
+						// Log network/API errors but don't block signup
+						console.error("Fraud check API error:", error);
+						Sentry.captureException(error, {
+							tags: { feature: "fraud-check", operation: "api-error" },
+							extra: { email },
+							level: "error",
+						});
+
+						// Allow signup to proceed if fraud check API is down
+						return;
+					}
+				}
+			}
+		}),
 		after: createAuthMiddleware(async (ctx) => {
 			// Your existing GitHub email fetching logic
 			const newSession = (
