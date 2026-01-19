@@ -2,13 +2,52 @@
 
 import * as Sentry from "@sentry/bun";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "../db";
 import { users } from "../db/schema";
 
 /**
- * Get user by email address
+ * User Response Schema - Controls what data is returned to clients
+ * Only exposes safe, necessary user information
  */
-export async function getUserByEmail(email: string) {
+export const UserResponseSchema = z.object({
+	id: z.uuid(),
+	email: z.email(),
+	name: z.string().nullable(),
+	image: z.string().nullable(),
+	emailVerified: z.boolean(),
+	twoFactorEnabled: z.boolean(),
+});
+
+export type UserResponse = z.infer<typeof UserResponseSchema>;
+
+/**
+ * Transform database user to safe response format
+ */
+function transformUserToResponse(dbUser: any): UserResponse {
+	return {
+		id: dbUser.id,
+		email: dbUser.email,
+		name: dbUser.name,
+		image: dbUser.image,
+		emailVerified: dbUser.emailVerified,
+		twoFactorEnabled: dbUser.twoFactorEnabled,
+	};
+}
+
+/**
+ * Get user by email address
+ *
+ * @param email - User's email address
+ * @returns Promise<UserResponse | null> - User data or null if not found
+ *
+ * @example
+ * ```typescript
+ * const user = await getUserByEmail("user@example.com");
+ * // Returns: { id, email, name, image, emailVerified, twoFactorEnabled }
+ * ```
+ */
+export async function getUserByEmail(email: string): Promise<UserResponse | null> {
 	try {
 		const user = await db
 			.select({
@@ -25,7 +64,12 @@ export async function getUserByEmail(email: string) {
 			.where(eq(users.email, email))
 			.limit(1);
 
-		return user[0] || null;
+		if (!user[0]) {
+			return null;
+		}
+
+		// Transform to safe response format
+		return transformUserToResponse(user[0]);
 	} catch (error) {
 		console.error("Error fetching user by email:", error);
 
@@ -50,8 +94,17 @@ export async function getUserByEmail(email: string) {
 
 /**
  * Get user by ID
+ *
+ * @param userId - User's unique identifier (UUID v7)
+ * @returns Promise<UserResponse | null> - User data or null if not found
+ *
+ * @example
+ * ```typescript
+ * const user = await getUserById("01234567-89ab-cdef-0123-456789abcdef");
+ * // Returns: { id, email, name, image, emailVerified, twoFactorEnabled }
+ * ```
  */
-export async function getUserById(userId: string) {
+export async function getUserById(userId: string): Promise<UserResponse | null> {
 	try {
 		const user = await db
 			.select({
@@ -68,7 +121,12 @@ export async function getUserById(userId: string) {
 			.where(eq(users.id, userId))
 			.limit(1);
 
-		return user[0] || null;
+		if (!user[0]) {
+			return null;
+		}
+
+		// Transform to safe response format
+		return transformUserToResponse(user[0]);
 	} catch (error) {
 		console.error("Error fetching user by ID:", error);
 
