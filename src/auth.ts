@@ -1,6 +1,7 @@
 // auth.ts
 
 import { passkey } from "@better-auth/passkey";
+import * as Sentry from "@sentry/bun";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware, jwt, openAPI, twoFactor } from "better-auth/plugins";
@@ -96,6 +97,19 @@ export const auth = betterAuth({
 				if (!res.ok) {
 					const text = await res.text().catch(() => "");
 					console.error("[hooks.after] GitHub API error", res.status, text);
+
+					// Capture GitHub API errors in Sentry
+					Sentry.captureException(new Error(`GitHub API error: ${res.status}`), {
+						tags: {
+							feature: "github-auth",
+							api: "github-emails",
+						},
+						extra: {
+							status: res.status,
+							response: text,
+							userId,
+						},
+					});
 					return;
 				}
 
@@ -147,6 +161,10 @@ export const auth = betterAuth({
 							});
 					} catch (err) {
 						console.error("[hooks.after] Failed to insert verified emails:", err);
+						Sentry.captureException(err, {
+							tags: { feature: "github-auth", operation: "insert-emails" },
+							extra: { userId, emailCount: filtered.length },
+						});
 					}
 
 					// Update flags
@@ -164,11 +182,15 @@ export const auth = betterAuth({
 						}
 					} catch (err) {
 						console.error("[hooks.after] Failed to update email flags:", err);
+						Sentry.captureException(err, {
+							tags: { feature: "github-auth", operation: "update-email-flags" },
+							extra: { userId, emailCount: filtered.length },
+						});
 					}
 
 					// Clean up stale records
+					const keepEmails = filtered.map((e) => e.email);
 					try {
-						const keepEmails = filtered.map((e) => e.email);
 						await db
 							.delete(schema.userEmails)
 							.where(
@@ -184,6 +206,10 @@ export const auth = betterAuth({
 							);
 					} catch (err) {
 						console.error("[hooks.after] Failed to clean up unverified/noreply emails:", err);
+						Sentry.captureException(err, {
+							tags: { feature: "github-auth", operation: "cleanup-emails" },
+							extra: { userId, keepEmailsCount: keepEmails.length },
+						});
 					}
 				}
 
@@ -193,6 +219,11 @@ export const auth = betterAuth({
 				);
 			} catch (e) {
 				console.error("[hooks.after] Failed to fetch/log GitHub emails:", e);
+				Sentry.captureException(e, {
+					tags: { feature: "github-auth", operation: "fetch-github-emails" },
+					extra: { userId },
+					level: "error",
+				});
 			}
 		}),
 	},
@@ -201,33 +232,39 @@ export const auth = betterAuth({
 		autoSignIn: false,
 		requireEmailVerification: true,
 		async sendResetPassword({ user, url, token }, request) {
-			// Use the imported function
-			await sendPasswordResetEmail(user, url);
+			try {
+				await sendPasswordResetEmail(user, url);
+			} catch (error) {
+				console.error("Failed to send password reset email:", error);
+				Sentry.captureException(error, {
+					tags: { feature: "auth", operation: "send-reset-email" },
+					user: { id: user.id, email: user.email },
+					extra: { url },
+				});
+				throw error; // Re-throw so Better Auth knows it failed
+			}
 		},
 		password: {},
 	},
 	emailVerification: {
 		sendOnSignUp: true,
 		autoSignInAfterVerification: false,
-		async sendVerificationEmail({ user, url, token }) {
-			// Extract callbackURL (default to /dashboard)
-			let callbackPath = "/success";
+		async sendVerificationEmail({ user, url }) {
 			try {
-				const u = new URL(url);
-				callbackPath = u.searchParams.get("callbackURL") || "/success";
-			} catch {}
-
-			// Build verify-api URL but with absolute client callback
-			const verifyApiUrl = new URL(`${SERVER_URL}/api/auth/verify-email`);
-			verifyApiUrl.searchParams.set("token", token);
-
-			// Fix: Use the first origin if allowedOrigins is an array
-			const origin = Array.isArray(allowedOrigins) ? allowedOrigins[0] : allowedOrigins;
-
-			verifyApiUrl.searchParams.set("callbackURL", `${origin}${callbackPath}`);
-			console.log("The verification URL is", verifyApiUrl.toString());
-
-			await sendVerificationEmail(user, verifyApiUrl.toString());
+				// The 'url' parameter already contains the full verification URL
+				// with the callbackURL from the client included as a query parameter.
+				// We just need to use it directly.
+				console.log("The verification URL is", url);
+				await sendVerificationEmail(user, url);
+			} catch (error) {
+				console.error("Failed to send verification email:", error);
+				Sentry.captureException(error, {
+					tags: { feature: "auth", operation: "send-verification-email" },
+					user: { id: user.id, email: user.email },
+					extra: { url },
+				});
+				throw error; // Re-throw so Better Auth knows it failed
+			}
 		},
 	},
 	plugins: [

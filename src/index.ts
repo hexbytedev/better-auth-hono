@@ -1,6 +1,24 @@
 // src/index.ts
 
+// Load environment variables FIRST
 import "dotenv/config";
+
+// Initialize Sentry SECOND
+import * as Sentry from "@sentry/bun";
+
+const SENTRY_DSN = process.env.SENTRY_DSN?.trim();
+if (SENTRY_DSN) {
+	Sentry.init({
+		dsn: SENTRY_DSN,
+		tracesSampleRate: 1.0,
+		sendDefaultPii: true,
+	});
+	console.log("Sentry initialized with DSN:", `${SENTRY_DSN.substring(0, 20)}...`);
+} else {
+	console.log("No Sentry DSN found");
+}
+
+// Now import everything else
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { auth } from "./auth";
@@ -45,6 +63,15 @@ app.route("/auth", authApp);
 
 // --- User routes ---
 app.route("/users", usersRoute);
+
+// --- Health Check Endpoint ---
+app.get("/health", (c) => {
+	return c.json({
+		status: "ok",
+		timestamp: new Date().toISOString(),
+		uptime: process.uptime(),
+	});
+});
 
 // --- Root Endpoint ---
 const rootApp = new Hono();
