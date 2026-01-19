@@ -74,9 +74,7 @@ export const validateBasicAuth = async (c: Context, next: Next) => {
 
 		if (!safeCompare(username, AUTH_USER) || !safeCompare(password, AUTH_PASS)) {
 			console.warn(
-				`[Security] Failed login attempt for user: "${username}" from IP: ${
-					c.req.header("x-forwarded-for") || "unknown"
-				}`,
+				`[Security] Failed login attempt from IP: ${c.req.header("x-forwarded-for") || "unknown"}`,
 			);
 
 			return c.json(
