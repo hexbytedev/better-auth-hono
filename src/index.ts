@@ -13,7 +13,9 @@ const SENTRY_SEND_DEFAULT_PII = process.env.SENTRY_SEND_DEFAULT_PII?.trim();
 if (SENTRY_DSN) {
 	Sentry.init({
 		dsn: SENTRY_DSN,
-		...(SENTRY_TRACES_SAMPLE_RATE ? { tracesSampleRate: parseFloat(SENTRY_TRACES_SAMPLE_RATE) } : {}),
+		...(SENTRY_TRACES_SAMPLE_RATE
+			? { tracesSampleRate: parseFloat(SENTRY_TRACES_SAMPLE_RATE) }
+			: {}),
 		sendDefaultPii: SENTRY_SEND_DEFAULT_PII === "true",
 	});
 	console.log("Sentry initialized with DSN:", `${SENTRY_DSN.substring(0, 20)}...`);
