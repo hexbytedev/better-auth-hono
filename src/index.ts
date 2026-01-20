@@ -11,7 +11,7 @@ if (SENTRY_DSN) {
 	Sentry.init({
 		dsn: SENTRY_DSN,
 		tracesSampleRate: 1.0,
-		sendDefaultPii: true,
+		sendDefaultPii: false,
 	});
 	console.log("Sentry initialized with DSN:", `${SENTRY_DSN.substring(0, 20)}...`);
 } else {

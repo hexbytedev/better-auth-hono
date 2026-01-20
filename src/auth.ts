@@ -47,10 +47,20 @@ if (!JWT_EXPIRATION_TIME) throw new Error("JWT_EXPIRATION_TIME is missing");
 const FRAUD_CHECK_API_URL = process.env.FRAUD_CHECK_API_URL?.trim();
 if (!FRAUD_CHECK_API_URL) throw new Error("FRAUD_CHECK_API_URL is missing");
 
+// Cross-subdomain and cookie configuration
+const CROSS_SUBDOMAIN_COOKIES_ENABLED = process.env.CROSS_SUBDOMAIN_COOKIES_ENABLED?.trim();
+const CROSS_SUBDOMAIN_COOKIES_DOMAIN = process.env.CROSS_SUBDOMAIN_COOKIES_DOMAIN?.trim();
+const COOKIE_SAME_SITE = process.env.COOKIE_SAME_SITE?.trim();
+const COOKIE_SECURE = process.env.COOKIE_SECURE?.trim();
+const COOKIE_HTTP_ONLY = process.env.COOKIE_HTTP_ONLY?.trim();
+const COOKIE_PARTITIONED = process.env.COOKIE_PARTITIONED?.trim();
+
 export const auth = betterAuth({
 	baseURL: SERVER_URL,
 	trustedOrigins: allowedOrigins,
 	secret: BETTER_AUTH_SECRET,
+
+	// Social OAuth providers configuration
 	socialProviders: {
 		google: {
 			clientId: GOOGLE_CLIENT_ID,
@@ -402,21 +412,16 @@ export const auth = betterAuth({
 		}),
 	],
 	advanced: {
-		// Testing new cookie config here
-		//! Uncomment this only when using authentication under sub domain
-		// crossSubDomainCookies: {
-		// 	enabled: true,
-		// 	domain: "sub.domain.com",
-		// },
-		defaultCookieAttributes: {
-			sameSite: "none",
-			secure: true,
-			httpOnly: true,
-			partitioned: true,
+		crossSubDomainCookies: {
+			enabled: CROSS_SUBDOMAIN_COOKIES_ENABLED === "true",
+			domain: CROSS_SUBDOMAIN_COOKIES_DOMAIN,
 		},
-
-		// ends here
-
+		defaultCookieAttributes: {
+			sameSite: COOKIE_SAME_SITE as "strict" | "lax" | "none",
+			secure: COOKIE_SECURE === "true",
+			httpOnly: COOKIE_HTTP_ONLY === "true",
+			partitioned: COOKIE_PARTITIONED === "true",
+		},
 		database: {
 			generateId: false,
 		},
