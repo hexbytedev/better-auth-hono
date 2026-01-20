@@ -47,10 +47,20 @@ if (!JWT_EXPIRATION_TIME) throw new Error("JWT_EXPIRATION_TIME is missing");
 const FRAUD_CHECK_API_URL = process.env.FRAUD_CHECK_API_URL?.trim();
 if (!FRAUD_CHECK_API_URL) throw new Error("FRAUD_CHECK_API_URL is missing");
 
+// Cross-subdomain and cookie configuration
+const CROSS_SUBDOMAIN_COOKIES_ENABLED = process.env.CROSS_SUBDOMAIN_COOKIES_ENABLED?.trim();
+const CROSS_SUBDOMAIN_COOKIES_DOMAIN = process.env.CROSS_SUBDOMAIN_COOKIES_DOMAIN?.trim();
+const COOKIE_SAME_SITE = process.env.COOKIE_SAME_SITE?.trim();
+const COOKIE_SECURE = process.env.COOKIE_SECURE?.trim();
+const COOKIE_HTTP_ONLY = process.env.COOKIE_HTTP_ONLY?.trim();
+const COOKIE_PARTITIONED = process.env.COOKIE_PARTITIONED?.trim();
+
 export const auth = betterAuth({
 	baseURL: SERVER_URL,
 	trustedOrigins: allowedOrigins,
 	secret: BETTER_AUTH_SECRET,
+
+	// Social OAuth providers configuration
 	socialProviders: {
 		google: {
 			clientId: GOOGLE_CLIENT_ID,
@@ -73,7 +83,7 @@ export const auth = betterAuth({
 
 				if (email && typeof email === "string") {
 					try {
-						// Check the full email first
+						// Step 1: Check the full email first
 						const emailResponse = await fetch(
 							`${FRAUD_CHECK_API_URL}/email/${encodeURIComponent(email)}`,
 							{
@@ -85,11 +95,17 @@ export const auth = betterAuth({
 						);
 
 						if (emailResponse.status === 200) {
-							// Email is valid, proceed
-							return;
+							// Email is valid, proceed to next checks
+						} else {
+							// Email check failed, throw error immediately
+							console.log(`Email fraud check failed for email: ${email}`);
+							throw new APIError("BAD_REQUEST", {
+								code: "EMAIL_NOT_ALLOWED",
+								message: "The email address is not allowed. Please use a different email address.",
+							});
 						}
 
-						// If email check fails, try domain check
+						// Step 2: If email passes, check domain
 						const domain = email.split("@")[1];
 						if (domain) {
 							const domainResponse = await fetch(
@@ -103,16 +119,81 @@ export const auth = betterAuth({
 							);
 
 							if (domainResponse.status === 200) {
-								// Domain is valid, proceed
-								return;
+								// Domain is valid, proceed to IP check
+							} else {
+								// Domain check failed, throw error
+								console.log(`Domain fraud check failed for domain: ${domain}`);
+								throw new APIError("BAD_REQUEST", {
+									code: "DOMAIN_NOT_ALLOWED",
+									message: "The email domain is not allowed. Please use a different email address.",
+								});
 							}
 						}
 
-						// Both checks failed, reject the signup
-						console.log(`Fraud check failed for email: ${email}`);
-						throw new APIError("BAD_REQUEST", {
-							message: "Email validation failed. Please use a different email address.",
-						});
+						// Step 3: Check IP address
+						// Get client IP address from various possible headers
+						const forwardedFor = ctx.request?.headers?.get("x-forwarded-for");
+						const realIP = ctx.request?.headers?.get("x-real-ip");
+						const cfConnectingIP = ctx.request?.headers?.get("cf-connecting-ip");
+						const remoteAddr = ctx.request?.headers?.get("remote-addr");
+
+						// Extract the first IP from x-forwarded-for if it contains multiple IPs
+						const clientIP =
+							forwardedFor?.split(",")[0]?.trim() ||
+							realIP ||
+							cfConnectingIP ||
+							remoteAddr ||
+							"unknown";
+
+						console.log(`Checking IP: ${clientIP} for email: ${email}`);
+
+						if (clientIP && clientIP !== "unknown") {
+							try {
+								const ipResponse = await fetch(
+									`${FRAUD_CHECK_API_URL}/ip/${encodeURIComponent(clientIP)}`,
+									{
+										method: "GET",
+										headers: {
+											"User-Agent": "better-auth-app",
+										},
+									},
+								);
+
+								if (ipResponse.status === 200) {
+									const ipData = await ipResponse.json();
+									const security = ipData?.security;
+
+									if (security && security.is_threat === true) {
+										console.log(`IP fraud check failed for IP: ${clientIP}`, {
+											is_threat: security.is_threat,
+										});
+										throw new APIError("FORBIDDEN", {
+											code: "IP_NOT_ALLOWED",
+											message: "Registration from your IP is blocked due to security concerns.",
+										});
+									}
+								} else {
+									// IP check API returned non-200, log but don't block
+									console.log(`IP check API returned ${ipResponse.status} for IP: ${clientIP}`);
+								}
+							} catch (ipError) {
+								if (ipError instanceof APIError) {
+									throw ipError; // Re-throw security validation errors
+								}
+								// Log IP check errors but don't block signup
+								console.error("IP fraud check API error:", ipError);
+								Sentry.captureException(ipError, {
+									tags: { feature: "fraud-check", operation: "ip-check-error" },
+									extra: { clientIP, email },
+									level: "warning",
+								});
+							}
+						} else {
+							console.log(`Could not determine client IP for email: ${email}`);
+						}
+
+						// All checks passed, allow registration
+						return;
 					} catch (error) {
 						if (error instanceof APIError) {
 							throw error; // Re-throw API validation errors
@@ -402,21 +483,16 @@ export const auth = betterAuth({
 		}),
 	],
 	advanced: {
-		// Testing new cookie config here
-		//! Uncomment this only when using authentication under sub domain
-		// crossSubDomainCookies: {
-		// 	enabled: true,
-		// 	domain: "sub.domain.com",
-		// },
-		defaultCookieAttributes: {
-			sameSite: "none",
-			secure: true,
-			httpOnly: true,
-			partitioned: true,
+		crossSubDomainCookies: {
+			enabled: CROSS_SUBDOMAIN_COOKIES_ENABLED === "true",
+			domain: CROSS_SUBDOMAIN_COOKIES_DOMAIN,
 		},
-
-		// ends here
-
+		defaultCookieAttributes: {
+			sameSite: COOKIE_SAME_SITE as "strict" | "lax" | "none",
+			secure: COOKIE_SECURE === "true",
+			httpOnly: COOKIE_HTTP_ONLY === "true",
+			partitioned: COOKIE_PARTITIONED === "true",
+		},
 		database: {
 			generateId: false,
 		},

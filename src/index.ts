@@ -7,11 +7,16 @@ import "dotenv/config";
 import * as Sentry from "@sentry/bun";
 
 const SENTRY_DSN = process.env.SENTRY_DSN?.trim();
+const SENTRY_TRACES_SAMPLE_RATE = process.env.SENTRY_TRACES_SAMPLE_RATE?.trim();
+const SENTRY_SEND_DEFAULT_PII = process.env.SENTRY_SEND_DEFAULT_PII?.trim();
+
 if (SENTRY_DSN) {
 	Sentry.init({
 		dsn: SENTRY_DSN,
-		tracesSampleRate: 1.0,
-		sendDefaultPii: true,
+		...(SENTRY_TRACES_SAMPLE_RATE
+			? { tracesSampleRate: parseFloat(SENTRY_TRACES_SAMPLE_RATE) }
+			: {}),
+		sendDefaultPii: SENTRY_SEND_DEFAULT_PII === "true",
 	});
 	console.log("Sentry initialized with DSN:", `${SENTRY_DSN.substring(0, 20)}...`);
 } else {
