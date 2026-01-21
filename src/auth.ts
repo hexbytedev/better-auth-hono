@@ -131,19 +131,21 @@ export const auth = betterAuth({
 						}
 
 						// Step 3: Check IP address
-						// Get client IP address from various possible headers
-						const forwardedFor = ctx.request?.headers?.get("x-forwarded-for");
-						const realIP = ctx.request?.headers?.get("x-real-ip");
-						const cfConnectingIP = ctx.request?.headers?.get("cf-connecting-ip");
-						const remoteAddr = ctx.request?.headers?.get("remote-addr");
+						// Check headers sequentially for client IP
+						const headers = ["cf-connecting-ip", "x-forwarded-for", "x-real-ip"];
+						let clientIP = "unknown";
 
-						// Extract the first IP from x-forwarded-for if it contains multiple IPs
-						const clientIP =
-							forwardedFor?.split(",")[0]?.trim() ||
-							realIP ||
-							cfConnectingIP ||
-							remoteAddr ||
-							"unknown";
+						for (const header of headers) {
+							const headerValue = ctx.request?.headers?.get(header);
+							if (headerValue) {
+								// For x-forwarded-for, take the first IP if it contains multiple IPs
+								clientIP =
+									header === "x-forwarded-for"
+										? headerValue.split(",")[0]?.trim()
+										: headerValue.trim();
+								break; // Found IP, stop checking other headers
+							}
+						}
 
 						console.log(`Checking IP: ${clientIP} for email: ${email}`);
 
