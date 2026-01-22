@@ -1,0 +1,19 @@
+name: local
+services:
+  better-auth-hono-migrate:
+    image: pilinux/better-auth-hono-migrate:0.0.1
+    container_name: better-auth-hono-migrate
+    restart: no
+    env_file:
+      - .env.local
+  better-auth-hono:
+    image: pilinux/better-auth-hono:0.0.1
+    container_name: better-auth-hono
+    restart: unless-stopped
+    env_file:
+      - .env.local
+    ports:
+      - '172.17.0.1:8558:8558'
+    depends_on:
+      better-auth-hono-migrate:
+        condition: service_completed_successfully
