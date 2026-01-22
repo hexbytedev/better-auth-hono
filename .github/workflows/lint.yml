@@ -1,0 +1,55 @@
+name: Linting
+run-name: ${{ github.actor }} is Linting on ${{ github.ref }}
+
+on:
+  push:
+    paths:
+      - '**/*.ts'
+      - '**/*.js'
+      - 'package.json'
+      - 'bun.lock'
+  pull_request:
+    paths:
+      - '**/*.ts'
+      - '**/*.js'
+      - 'package.json'
+      - 'bun.lock'
+
+# Prevents multiple workflow runs for the same ref/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Explicitly define permissions for security
+permissions:
+  contents: read
+
+jobs:
+  linting:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: true
+      matrix:
+        bun: [1.3.6]
+
+    name: BUN ${{ matrix.bun }}
+
+    steps:
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v6
+
+      - name: 🐰 Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ matrix.bun }}
+
+      - name: ⚡ Install dependencies (with bun)
+        run: bun install
+
+      - name: 🔍 Lint
+        run: bun run lint
+
+      - name: 🛡️ Audit dependencies
+        run: bun audit

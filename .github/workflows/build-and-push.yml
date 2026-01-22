@@ -1,0 +1,94 @@
+name: Build and Push Docker Image
+
+permissions:
+  contents: read
+  packages: write
+
+on:
+  push:
+    tags:
+      - '*'  # trigger on any tag like v1.0.0 or 1.0.0
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 1.2.3 or v1.2.3)'
+        required: false
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v6
+
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔑 Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+
+      - name: 🏷️ Set Docker tags
+        id: set-tag
+        env:
+          MANUAL_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          # Extract the tag name (strip refs/tags/)
+          VERSION=${GITHUB_REF#refs/tags/}
+          # Remove leading 'v' if present to support both v1.2.3 and 1.2.3
+          VERSION=${VERSION#v}
+          # If this is a manual run and a version was provided, use it (strip leading v if present)
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${MANUAL_VERSION}" ]; then
+            MANUAL_VERSION=${MANUAL_VERSION#v}
+            VERSION=${MANUAL_VERSION}
+            echo "::notice::Using manual version input: ${VERSION}"
+          fi
+          # If VERSION is non-empty set the tag outputs, otherwise set empty to avoid accidental pushes
+          if [ -n "$VERSION" ]; then
+            echo "tags=ghcr.io/hexbytedev/better-auth-hono:$VERSION" >> $GITHUB_OUTPUT
+            echo "migrate_tags=ghcr.io/hexbytedev/better-auth-hono-migrate:$VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "tags=" >> $GITHUB_OUTPUT
+            echo "migrate_tags=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🔍 Show computed image tag
+        env:
+          TAG: ${{ steps.set-tag.outputs.tags }}
+        run: |
+          if [ -n "${TAG}" ]; then
+            echo "::notice::Computed image tag: ${TAG}"
+          else
+            echo "::warning::No tag detected; build will be skipped."
+          fi
+
+      - name: 🚀 Build and push runner image
+        if: ${{ steps.set-tag.outputs.tags != '' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: runner
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.set-tag.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 🛠️ Build and push migration image
+        if: ${{ steps.set-tag.outputs.migrate_tags != '' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: migrate
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.set-tag.outputs.migrate_tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
