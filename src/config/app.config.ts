@@ -11,7 +11,7 @@ export interface CorsConfig {
 const DEFAULT_CORS_CONFIG: CorsConfig = {
 	allowedHeaders: ["Content-Type", "Authorization", "Cookie", "X-API-Key"],
 	allowedMethods: ["POST", "GET", "OPTIONS", "PUT", "DELETE", "PATCH"],
-	exposeHeaders: ["Content-Length", "Set-Cookie", "set-auth-token"],
+	exposeHeaders: ["Content-Length", "Set-Cookie", "Set-Auth-Token"],
 	maxAge: 600,
 };
 
