@@ -52,4 +52,4 @@ jobs:
         run: bun run lint
 
       - name: 🛡️ Audit dependencies
-        run: bun audit
+        run: bun audit --audit-level=high
