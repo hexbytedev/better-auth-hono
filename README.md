@@ -34,6 +34,18 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 - `bun run build`
 - `bun run start`
 
+### Code quality
+
+This project uses Husky for Git hooks to ensure code quality:
+
+- **Pre-commit hook**: Automatically runs `biome check --write` to lint and format code before each commit
+- **Commit-msg hook**: Validates commit messages (minimum 10 characters)
+
+To manually run linting and formatting:
+- `bun run lint` - Lint and auto-fix issues
+- `bun run lint:check` - Check for issues without fixing
+- `bun run format` - Format code
+
 ### Key files
 
 - `src/index.ts` - app bootstrap, CORS, mounts Better-Auth and internal routes.

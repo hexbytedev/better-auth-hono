@@ -1,19 +1,4 @@
-// src/config/cors.config.ts
-
-export interface CorsConfig {
-	allowedHeaders: string[];
-	allowedMethods: string[];
-	exposeHeaders: string[];
-	maxAge: number;
-}
-
-// Default CORS configuration - these are ALWAYS used if env vars are not provided
-const DEFAULT_CORS_CONFIG: CorsConfig = {
-	allowedHeaders: ["Content-Type", "Authorization", "Cookie", "X-API-Key"],
-	allowedMethods: ["POST", "GET", "OPTIONS", "PUT", "DELETE", "PATCH"],
-	exposeHeaders: ["Content-Length", "Set-Cookie", "Set-Auth-Token"],
-	maxAge: 600,
-};
+// src/config/app.config.ts
 
 // Default application settings
 const DEFAULT_APP_PORT = 8558;
@@ -96,28 +81,6 @@ export function getAppPort(): number {
 export function getAppHost(): string | undefined {
 	const trimmed = safeTrim(process.env.APP_HOST);
 	return trimmed || undefined;
-}
-
-/**
- * Get CORS configuration from environment variables with defaults
- * If env vars are not provided, defaults are used
- */
-export function getCorsConfig(): CorsConfig {
-	const userHeaders = parseCommaSeparated(process.env.CORS_ALLOWED_HEADERS);
-	const userMethods = parseCommaSeparated(process.env.CORS_ALLOWED_METHODS);
-	const userExposeHeaders = parseCommaSeparated(process.env.CORS_EXPOSE_HEADERS);
-
-	return {
-		allowedHeaders: userHeaders.length > 0 ? userHeaders : DEFAULT_CORS_CONFIG.allowedHeaders,
-		allowedMethods: userMethods.length > 0 ? userMethods : DEFAULT_CORS_CONFIG.allowedMethods,
-		exposeHeaders:
-			userExposeHeaders.length > 0 ? userExposeHeaders : DEFAULT_CORS_CONFIG.exposeHeaders,
-		maxAge: parseNumber(process.env.CORS_MAX_AGE, DEFAULT_CORS_CONFIG.maxAge, {
-			min: 0,
-			max: 86400,
-			name: "CORS_MAX_AGE",
-		}),
-	};
 }
 
 /**

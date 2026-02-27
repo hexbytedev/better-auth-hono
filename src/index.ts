@@ -27,44 +27,42 @@ if (SENTRY_DSN) {
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { auth } from "./auth";
-import { getAllowedOrigins, getAppHost, getAppPort, getCorsConfig } from "./config/app.config";
+import { getAllowedOrigins, getAppHost, getAppPort } from "./config/app.config";
 import usersRoute from "./routes/users.route";
 
 const allowedOrigins = getAllowedOrigins();
-const corsConfig = getCorsConfig();
 
 console.log("Allowed Origins:", allowedOrigins);
-console.log("CORS Config:", corsConfig);
 console.log("App Port:", getAppPort());
 console.log("App Host:", getAppHost() || "default");
 
 const app = new Hono().basePath("/api");
 
-// --- Single, Unified CORS Middleware ---
+// --- CORS Middleware (simplified) ---
 app.use(
 	"/*",
 	cors({
 		origin: (origin) => {
+			// Allow requests with no origin (like mobile apps or curl)
 			if (!origin) return origin;
+			// Check if origin is in allowed list
 			if (allowedOrigins.includes(origin)) {
 				return origin;
 			}
 			return null;
 		},
-		allowHeaders: corsConfig.allowedHeaders,
-		allowMethods: corsConfig.allowedMethods,
-		exposeHeaders: corsConfig.exposeHeaders,
-		maxAge: corsConfig.maxAge,
+		allowHeaders: ["Content-Type", "Authorization", "Cookie", "X-API-Key"],
+		allowMethods: ["POST", "GET", "OPTIONS", "PUT", "DELETE", "PATCH"],
+		exposeHeaders: ["Content-Length", "Set-Cookie"],
+		maxAge: 600,
 		credentials: true,
 	}),
 );
 
 // --- Mount Better Auth ---
-const authApp = new Hono();
-authApp.all("*", (c) => {
+app.on(["POST", "GET"], "/auth/*", (c) => {
 	return auth.handler(c.req.raw);
 });
-app.route("/auth", authApp);
 
 // --- User routes ---
 app.route("/users", usersRoute);
@@ -107,7 +105,6 @@ rootApp.get("/", (c) => {
 rootApp.get("/debug-origins", (c) => {
 	return c.json({
 		allowedOrigins: getAllowedOrigins(),
-		corsConfig: getCorsConfig(),
 		appPort: getAppPort(),
 		appHost: getAppHost(),
 		clientUrl: process.env.CLIENT_URL?.trim(),
