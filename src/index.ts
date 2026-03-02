@@ -36,9 +36,9 @@ console.log("Allowed Origins:", allowedOrigins);
 console.log("App Port:", getAppPort());
 console.log("App Host:", getAppHost() || "default");
 
-const app = new Hono().basePath("/api");
+const app = new Hono();
 
-// --- CORS Middleware (simplified) ---
+// --- CORS Middleware ---
 app.use(
 	"/*",
 	cors({
@@ -51,24 +51,24 @@ app.use(
 			}
 			return null;
 		},
-		allowHeaders: ["Content-Type", "Authorization", "Cookie", "X-API-Key"],
-		allowMethods: ["POST", "GET", "OPTIONS", "PUT", "DELETE", "PATCH"],
-		exposeHeaders: ["Content-Length", "Set-Cookie"],
+		allowHeaders: ["Content-Type", "Authorization"],
+		allowMethods: ["POST", "GET", "OPTIONS"],
+		exposeHeaders: ["Content-Length"],
 		maxAge: 600,
 		credentials: true,
 	}),
 );
 
 // --- Mount Better Auth ---
-app.on(["POST", "GET"], "/auth/*", (c) => {
+app.on(["POST", "GET"], "/api/auth/*", (c) => {
 	return auth.handler(c.req.raw);
 });
 
 // --- User routes ---
-app.route("/users", usersRoute);
+app.route("/api/users", usersRoute);
 
 // --- Health Check Endpoint ---
-app.get("/health", (c) => {
+app.get("/api/health", (c) => {
 	return c.json({
 		status: "ok",
 		timestamp: new Date().toISOString(),
@@ -77,8 +77,7 @@ app.get("/health", (c) => {
 });
 
 // --- Root Endpoint ---
-const rootApp = new Hono();
-rootApp.get("/", (c) => {
+app.get("/", (c) => {
 	const baseUrl = c.req.url;
 
 	return c.json({
@@ -90,19 +89,19 @@ rootApp.get("/", (c) => {
 				href: new URL("/api/auth/reference", baseUrl).href,
 			},
 			{
-				text: "User API - Get by ID (Requires X-API-Key)",
+				text: "User API - Get by ID (Requires Basic Auth)",
 				href: new URL("/api/users/id/:id", baseUrl).href,
 			},
 			{
-				text: "User API - Get by Email (Requires X-API-Key)",
+				text: "User API - Get by Email (Requires Basic Auth)",
 				href: new URL("/api/users/email/:email", baseUrl).href,
 			},
 		],
 	});
 });
 
-// These configs are coming from src/app.config.ts
-rootApp.get("/debug-origins", (c) => {
+// --- Debug endpoint ---
+app.get("/debug-origins", (c) => {
 	return c.json({
 		allowedOrigins: getAllowedOrigins(),
 		appPort: getAppPort(),
@@ -112,18 +111,9 @@ rootApp.get("/debug-origins", (c) => {
 	});
 });
 
-// Combined fetch handler for routing
-const handleRequest = (req: Request): Response | Promise<Response> => {
-	const url = new URL(req.url);
-	if (url.pathname.startsWith("/api")) {
-		return app.fetch(req);
-	}
-	return rootApp.fetch(req);
-};
-
-// These configs are coming from src/app.config.ts
+// Export for Bun
 export default {
 	port: getAppPort(),
 	host: getAppHost(),
-	fetch: handleRequest,
+	fetch: app.fetch,
 };

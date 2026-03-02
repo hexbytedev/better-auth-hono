@@ -20,11 +20,11 @@ const userIdSchema = z.object({
 /**
  * GET /api/users/email/:email
  * Fetch user information by email address
- * Protected by X-API-Key header
+ * Protected by Basic Authentication
  *
  * @route GET /api/users/email/:email
  * @param {string} email - User's email address (must be valid email format)
- * @header {string} X-API-Key - Required API key for authentication
+ * @header {string} Authorization - Required Basic Auth header (format: "Basic base64(username:password)")
  *
  * @returns {200} Success Response
  * ```json
@@ -50,7 +50,7 @@ const userIdSchema = z.object({
  * }
  * ```
  *
- * @returns {401} Unauthorized - Invalid or missing API key
+ * @returns {401} Unauthorized - Invalid or missing Basic Auth credentials
  * @returns {400} Bad Request - Invalid email format
  * @returns {500} Internal Server Error - Database or system error
  */
@@ -112,11 +112,11 @@ usersRoute.get("/email/:email", validateBasicAuth, zValidator("param", emailSche
 /**
  * GET /api/users/id/:id
  * Fetch user information by user ID
- * Protected by X-API-Key header
+ * Protected by Basic Authentication
  *
  * @route GET /api/users/id/:id
  * @param {string} id - User's unique identifier (UUID v7 format)
- * @header {string} X-API-Key - Required API key for authentication
+ * @header {string} Authorization - Required Basic Auth header (format: "Basic base64(username:password)")
  *
  * @returns {200} Success Response
  * ```json
@@ -142,7 +142,7 @@ usersRoute.get("/email/:email", validateBasicAuth, zValidator("param", emailSche
  * }
  * ```
  *
- * @returns {401} Unauthorized - Invalid or missing API key
+ * @returns {401} Unauthorized - Invalid or missing Basic Auth credentials
  * @returns {400} Bad Request - Invalid UUID format
  * @returns {500} Internal Server Error - Database or system error
  */
