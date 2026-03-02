@@ -1,8 +1,2 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
-# Run biome check (lint and format)
 bun run lint
-
-# Add the formatted/linted files back to staging
 git add -u
