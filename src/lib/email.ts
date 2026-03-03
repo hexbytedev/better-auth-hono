@@ -12,8 +12,13 @@ if (!EMAIL_FROM) throw new Error("EMAIL_FROM is missing");
 const COMPANY_NAME = process.env.COMPANY_NAME?.trim();
 if (!COMPANY_NAME) throw new Error("COMPANY_NAME is missing");
 
-const PRIMARY_COLOR = process.env.PRIMARY_COLOR?.trim();
-if (!PRIMARY_COLOR) throw new Error("PRIMARY_COLOR is missing");
+const PRIMARY_COLOR_RAW = process.env.PRIMARY_COLOR?.trim();
+if (!PRIMARY_COLOR_RAW) throw new Error("PRIMARY_COLOR is missing");
+
+// Add # prefix if not present
+const PRIMARY_COLOR = PRIMARY_COLOR_RAW.startsWith("#")
+	? PRIMARY_COLOR_RAW
+	: `#${PRIMARY_COLOR_RAW}`;
 
 // Token expiration in seconds (used for both email verification and password reset)
 const TOKEN_EXPIRATION_SECONDS = Number.parseInt(
