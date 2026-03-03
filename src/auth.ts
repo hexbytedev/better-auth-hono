@@ -47,6 +47,12 @@ if (!JWT_EXPIRATION_TIME) throw new Error("JWT_EXPIRATION_TIME is missing");
 const FRAUD_CHECK_API_URL = process.env.FRAUD_CHECK_API_URL?.trim();
 if (!FRAUD_CHECK_API_URL) throw new Error("FRAUD_CHECK_API_URL is missing");
 
+// Token expiration in seconds (used for both email verification and password reset)
+const TOKEN_EXPIRATION_SECONDS = Number.parseInt(
+	process.env.TOKEN_EXPIRATION_SECONDS?.trim() || "3600",
+	10,
+);
+
 // Cross-subdomain and cookie configuration
 const CROSS_SUBDOMAIN_COOKIES_ENABLED = process.env.CROSS_SUBDOMAIN_COOKIES_ENABLED?.trim();
 const CROSS_SUBDOMAIN_COOKIES_DOMAIN = process.env.CROSS_SUBDOMAIN_COOKIES_DOMAIN?.trim();
@@ -399,6 +405,7 @@ export const auth = betterAuth({
 			}
 		},
 		password: {},
+		resetPasswordTokenExpiresIn: TOKEN_EXPIRATION_SECONDS,
 	},
 	emailVerification: {
 		sendOnSignUp: true,
@@ -420,6 +427,7 @@ export const auth = betterAuth({
 				throw error; // Re-throw so Better Auth knows it failed
 			}
 		},
+		expiresIn: TOKEN_EXPIRATION_SECONDS,
 	},
 	plugins: [
 		openAPI(),

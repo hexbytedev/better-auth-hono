@@ -1,67 +1,150 @@
 // lib/email.ts
 
 import * as Sentry from "@sentry/bun";
+import { Resend } from "resend";
 
-const EMAIL_SERVICE_URL = process.env.EMAIL_SERVICE_API?.trim();
-if (!EMAIL_SERVICE_URL) throw new Error("EMAIL_SERVICE_API is missing");
+const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim();
+if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY is missing");
 
-// --- New Environment Variables for Basic Auth ---
-const EMAIL_SERVICE_USERNAME = process.env.EMAIL_SERVICE_USERNAME?.trim();
-if (!EMAIL_SERVICE_USERNAME) throw new Error("EMAIL_SERVICE_USERNAME is missing");
+const EMAIL_FROM = process.env.EMAIL_FROM?.trim();
+if (!EMAIL_FROM) throw new Error("EMAIL_FROM is missing");
 
-const EMAIL_SERVICE_PASSWORD = process.env.EMAIL_SERVICE_PASSWORD?.trim();
-if (!EMAIL_SERVICE_PASSWORD) throw new Error("EMAIL_SERVICE_PASSWORD is missing");
+const COMPANY_NAME = process.env.COMPANY_NAME?.trim();
+if (!COMPANY_NAME) throw new Error("COMPANY_NAME is missing");
+
+const PRIMARY_COLOR = process.env.PRIMARY_COLOR?.trim();
+if (!PRIMARY_COLOR) throw new Error("PRIMARY_COLOR is missing");
+
+// Token expiration in seconds (used for both email verification and password reset)
+const TOKEN_EXPIRATION_SECONDS = Number.parseInt(
+	process.env.TOKEN_EXPIRATION_SECONDS?.trim() || "3600",
+	10,
+);
+
+const resend = new Resend(RESEND_API_KEY);
+
+// Helper to convert seconds to human-readable format
+function formatExpirationTime(seconds: number): string {
+	const hours = Math.floor(seconds / 3600);
+	const minutes = Math.floor((seconds % 3600) / 60);
+
+	if (hours > 0 && minutes > 0) {
+		return `${hours} hour${hours > 1 ? "s" : ""} and ${minutes} minute${minutes > 1 ? "s" : ""}`;
+	}
+	if (hours > 0) {
+		return `${hours} hour${hours > 1 ? "s" : ""}`;
+	}
+	if (minutes > 0) {
+		return `${minutes} minute${minutes > 1 ? "s" : ""}`;
+	}
+	return `${seconds} second${seconds > 1 ? "s" : ""}`;
+}
 
 interface User {
 	email: string;
 	name?: string;
 }
 
-async function sendEmail(endpoint: string, data: any) {
-	// Create the Base64 encoded credentials for the Authorization header
-	const credentials = `${EMAIL_SERVICE_USERNAME}:${EMAIL_SERVICE_PASSWORD}`;
-	const encodedCredentials = Buffer.from(credentials).toString("base64");
-
-	const url = `${EMAIL_SERVICE_URL}${endpoint}`;
-	const response = await fetch(url, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			// The Authorization header for Basic Auth
-			Authorization: `Basic ${encodedCredentials}`,
-		},
-		body: JSON.stringify(data),
+async function sendEmail(emailType: string, to: string, subject: string, html: string) {
+	const { data, error } = await resend.emails.send({
+		from: `${COMPANY_NAME} <${EMAIL_FROM}>`,
+		to: [to],
+		subject,
+		html,
+		replyTo: EMAIL_FROM,
 	});
 
-	const responseData = await response.json().catch(() => ({}));
-
-	if (!response.ok) {
-		const error = new Error(`Failed to send email: ${response.status} ${response.statusText}`);
+	if (error) {
+		const emailError = new Error(`Failed to send email: ${error.message}`);
 
 		// Send to Sentry with email service context
-		Sentry.captureException(error, {
+		Sentry.captureException(emailError, {
 			tags: {
 				feature: "email-service",
 				operation: "send-email",
-				emailType: endpoint.split("/").pop() || "unknown",
+				emailType,
+				errorName: error.name,
 			},
 			extra: {
-				endpoint,
-				status: response.status,
-				statusText: response.statusText,
-				responseData,
-				emailServiceUrl: EMAIL_SERVICE_URL,
+				errorMessage: error.message,
+				statusCode: error.statusCode,
 				// Don't log sensitive email content, just metadata
-				hasUserData: !!data.user,
-				userEmail: data.user?.email ? `***@${data.user.email.split("@")[1]}` : undefined,
+				recipientDomain: to.split("@")[1],
 			},
 			level: "error",
 		});
 
-		throw error;
+		throw emailError;
 	}
 
-	return responseData;
+	return data;
+}
+
+/**
+ * Reusable HTML wrapper for email consistency across devices
+ */
+function getEmailTemplate(title: string, bodyContent: string, footerContent: string) {
+	return `
+	<!DOCTYPE html>
+	<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+		<head>
+			<meta charset="utf-8">
+			<meta name="viewport" content="width=device-width, initial-scale=1.0">
+			<meta name="color-scheme" content="light dark">
+			<meta name="supported-color-schemes" content="light dark">
+			<!--[if mso]>
+			<noscript>
+				<xml>
+					<o:OfficeDocumentSettings>
+						<o:PixelsPerInch>96</o:PixelsPerInch>
+					</o:OfficeDocumentSettings>
+				</xml>
+			</noscript>
+			<![endif]-->
+			<style>
+				body { margin: 0; padding: 0; background-color: #f4f4f5; -webkit-font-smoothing: antialiased; }
+				table { border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+				p { margin: 0; padding: 0; margin-bottom: 24px; }
+				a { text-decoration: none; }
+			</style>
+		</head>
+		<body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+			<table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5;">
+				<tr>
+					<td align="center" style="padding: 40px 20px;">
+						<!--[if mso]>
+						<table align="center" width="600" cellspacing="0" cellpadding="0" border="0">
+						<tr><td>
+						<![endif]-->
+						<table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #ffffff; border: 1px solid #e4e4e7;">
+							<tr>
+								<td style="padding: 48px 40px;">
+									<h1 style="margin: 0 0 24px 0; font-size: 24px; font-weight: 600; color: #18181b; letter-spacing: -0.5px;">${title}</h1>
+									
+									<div style="font-size: 16px; line-height: 1.6; color: #3f3f46;">
+										${bodyContent}
+									</div>
+								</td>
+							</tr>
+						</table>
+						
+						<table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px;">
+							<tr>
+								<td style="padding: 32px 40px; text-align: left; font-size: 13px; line-height: 1.6; color: #71717a;">
+									${footerContent}
+								</td>
+							</tr>
+						</table>
+						<!--[if mso]>
+						</td></tr>
+						</table>
+						<![endif]-->
+					</td>
+				</tr>
+			</table>
+		</body>
+	</html>
+	`;
 }
 
 /**
@@ -71,13 +154,27 @@ async function sendEmail(endpoint: string, data: any) {
  * @returns Promise with the email service response
  */
 export async function sendVerificationEmail(user: User, verificationUrl: string) {
-	return sendEmail("/emails/auth/verification-email", {
-		user: {
-			email: user.email,
-			name: user.name || "",
-		},
-		verificationUrl,
-	});
+	const subject = "Verify your email address";
+
+	const bodyContent = `
+		<p>Hello ${user.name || "there"},</p>
+		<p>Thank you for signing up with <strong>${COMPANY_NAME}</strong>. To complete your registration and secure your account, please verify your email address.</p>
+		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 10px; margin-bottom: 10px;">
+			<tr>
+				<td align="left">
+					<a href="${verificationUrl}" style="background-color: ${PRIMARY_COLOR}; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid ${PRIMARY_COLOR};">Verify Email Address</a>
+				</td>
+			</tr>
+		</table>
+		<p style="font-size: 14px; color: #71717a;">This link will expire in ${formatExpirationTime(TOKEN_EXPIRATION_SECONDS)}.</p>
+	`;
+
+	const footerContent = `
+		If you didn't create an account with us, you can safely ignore this email.
+	`;
+
+	const html = getEmailTemplate(subject, bodyContent, footerContent);
+	return sendEmail("verification", user.email, subject, html);
 }
 
 /**
@@ -87,11 +184,25 @@ export async function sendVerificationEmail(user: User, verificationUrl: string)
  * @returns Promise with the email service response
  */
 export async function sendPasswordResetEmail(user: User, resetUrl: string) {
-	return sendEmail("/emails/auth/password-reset-email", {
-		user: {
-			email: user.email,
-			name: user.name || "",
-		},
-		resetUrl,
-	});
+	const subject = "Reset your password";
+
+	const bodyContent = `
+		<p>Hello ${user.name || "there"},</p>
+		<p>We received a request to reset the password for your <strong>${COMPANY_NAME}</strong> account. You can set a new password by clicking the button below.</p>
+		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 10px; margin-bottom: 10px;">
+			<tr>
+				<td align="left">
+					<a href="${resetUrl}" style="background-color: ${PRIMARY_COLOR}; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid ${PRIMARY_COLOR};">Reset Password</a>
+				</td>
+			</tr>
+		</table>
+		<p style="font-size: 14px; color: #71717a;">This link will expire in ${formatExpirationTime(TOKEN_EXPIRATION_SECONDS)}.</p>
+	`;
+
+	const footerContent = `
+		If you didn't request a password reset, you can safely ignore this email. Your current password will remain unchanged.
+	`;
+
+	const html = getEmailTemplate(subject, bodyContent, footerContent);
+	return sendEmail("password-reset", user.email, subject, html);
 }
