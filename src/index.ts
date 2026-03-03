@@ -28,6 +28,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { auth } from "./auth";
 import { getAllowedOrigins, getAppHost, getAppPort } from "./config/app.config";
+import { isBasicAuthEnabled } from "./middleware/api-key.middleware";
 import usersRoute from "./routes/users.route";
 
 const allowedOrigins = getAllowedOrigins();
@@ -35,6 +36,16 @@ const allowedOrigins = getAllowedOrigins();
 console.log("Allowed Origins:", allowedOrigins);
 console.log("App Port:", getAppPort());
 console.log("App Host:", getAppHost() || "default");
+
+// Log Basic Auth status
+if (isBasicAuthEnabled) {
+	console.log("✅ Basic Authentication: ENABLED");
+	console.log("   Protected routes: /api/users/* are accessible with credentials");
+} else {
+	console.log("⚠️  Basic Authentication: DISABLED");
+	console.log("   API_AUTH_USER or API_AUTH_PASSWORD not configured");
+	console.log("   Protected routes: /api/users/* are NOT mounted");
+}
 
 const app = new Hono();
 
@@ -64,8 +75,22 @@ app.on(["POST", "GET"], "/api/auth/*", (c) => {
 	return auth.handler(c.req.raw);
 });
 
-// --- User routes ---
-app.route("/api/users", usersRoute);
+// --- User routes (conditionally mounted) ---
+if (isBasicAuthEnabled) {
+	app.route("/api/users", usersRoute);
+} else {
+	// Return 503 Service Unavailable for user routes when Basic Auth is not configured
+	app.all("/api/users/*", (c) => {
+		return c.json(
+			{
+				success: false,
+				error: "Service Unavailable",
+				message: "User API endpoints are disabled. Basic authentication is not configured.",
+			},
+			503,
+		);
+	});
+}
 
 // --- Health Check Endpoint ---
 app.get("/api/health", (c) => {
@@ -80,14 +105,16 @@ app.get("/api/health", (c) => {
 app.get("/", (c) => {
 	const baseUrl = c.req.url;
 
-	return c.json({
-		message: "Hello Hono x Better Auth!",
-		description: "This is a simple example of a Hono x Better Auth application.",
-		links: [
-			{
-				text: "Go to the Authentication API Documentation",
-				href: new URL("/api/auth/reference", baseUrl).href,
-			},
+	const links = [
+		{
+			text: "Go to the Authentication API Documentation",
+			href: new URL("/api/auth/reference", baseUrl).href,
+		},
+	];
+
+	// Only show user API links if Basic Auth is enabled
+	if (isBasicAuthEnabled) {
+		links.push(
 			{
 				text: "User API - Get by ID (Requires Basic Auth)",
 				href: new URL("/api/users/id/:id", baseUrl).href,
@@ -96,7 +123,14 @@ app.get("/", (c) => {
 				text: "User API - Get by Email (Requires Basic Auth)",
 				href: new URL("/api/users/email/:email", baseUrl).href,
 			},
-		],
+		);
+	}
+
+	return c.json({
+		message: "Hello Hono x Better Auth!",
+		description: "This is a simple example of a Hono x Better Auth application.",
+		basicAuth: isBasicAuthEnabled ? "enabled" : "disabled",
+		links,
 	});
 });
 
