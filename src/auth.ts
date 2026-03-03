@@ -1,11 +1,11 @@
 // auth.ts
 
+import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { passkey } from "@better-auth/passkey";
 import * as Sentry from "@sentry/bun";
 import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError } from "better-auth/api";
-import { createAuthMiddleware, jwt, openAPI, twoFactor } from "better-auth/plugins";
+import { APIError, createAuthMiddleware } from "better-auth/api";
+import { jwt, openAPI, twoFactor } from "better-auth/plugins";
 import { and, eq, ilike, inArray, not, or } from "drizzle-orm";
 import { getAllowedOrigins } from "./config/app.config";
 import { db } from "./db";
