@@ -20,18 +20,6 @@ if (!SERVER_URL) throw new Error("BETTER_AUTH_SERVER_URL is missing");
 const BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET?.trim();
 if (!BETTER_AUTH_SECRET) throw new Error("BETTER_AUTH_SECRET is missing");
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID?.trim();
-if (!GOOGLE_CLIENT_ID) throw new Error("GOOGLE_CLIENT_ID is missing");
-
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET?.trim();
-if (!GOOGLE_CLIENT_SECRET) throw new Error("GOOGLE_CLIENT_SECRET is missing");
-
-const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID?.trim();
-if (!GITHUB_CLIENT_ID) throw new Error("GITHUB_CLIENT_ID is missing");
-
-const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET?.trim();
-if (!GITHUB_CLIENT_SECRET) throw new Error("GITHUB_CLIENT_SECRET is missing");
-
 const BETTER_AUTH_RP_ID = process.env.BETTER_AUTH_RP_ID?.trim();
 if (!BETTER_AUTH_RP_ID) throw new Error("BETTER_AUTH_RP_ID is missing");
 
@@ -44,8 +32,8 @@ if (!CLIENT_URL) throw new Error("CLIENT_URL is missing");
 const JWT_EXPIRATION_TIME = process.env.JWT_EXPIRATION_TIME?.trim();
 if (!JWT_EXPIRATION_TIME) throw new Error("JWT_EXPIRATION_TIME is missing");
 
+// Optional: Fraud check API URL
 const FRAUD_CHECK_API_URL = process.env.FRAUD_CHECK_API_URL?.trim();
-if (!FRAUD_CHECK_API_URL) throw new Error("FRAUD_CHECK_API_URL is missing");
 
 // Token expiration in seconds (used for both email verification and password reset)
 const TOKEN_EXPIRATION_SECONDS = Number.parseInt(
@@ -61,25 +49,42 @@ const COOKIE_SECURE = process.env.COOKIE_SECURE?.trim();
 const COOKIE_HTTP_ONLY = process.env.COOKIE_HTTP_ONLY?.trim();
 const COOKIE_PARTITIONED = process.env.COOKIE_PARTITIONED?.trim();
 
+// --- Dynamic Provider Flags ---
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID?.trim();
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET?.trim();
+const isGoogleEnabled = Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
+
+const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID?.trim();
+const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET?.trim();
+const isGithubEnabled = Boolean(GITHUB_CLIENT_ID && GITHUB_CLIENT_SECRET);
+
+// Check if email/password authentication should be enabled (Defaults to true unless explicitly "false")
+const EMAIL_PASSWORD_ENABLED = process.env.EMAIL_PASSWORD_ENABLED?.trim() !== "false";
+
 export const auth = betterAuth({
 	baseURL: SERVER_URL,
 	trustedOrigins: allowedOrigins,
 	secret: BETTER_AUTH_SECRET,
 
-	// Social OAuth providers configuration
+	// Conditionally add Social Providers
 	socialProviders: {
-		google: {
-			clientId: GOOGLE_CLIENT_ID,
-			clientSecret: GOOGLE_CLIENT_SECRET,
-			redirectURI: `${SERVER_URL}/api/auth/callback/google`,
-		},
-		github: {
-			clientId: GITHUB_CLIENT_ID,
-			clientSecret: GITHUB_CLIENT_SECRET,
-			scope: ["read:user", "user:email"],
-			redirectURI: `${SERVER_URL}/api/auth/callback/github`,
-		},
+		...(isGoogleEnabled && {
+			google: {
+				clientId: GOOGLE_CLIENT_ID as string,
+				clientSecret: GOOGLE_CLIENT_SECRET as string,
+				redirectURI: `${SERVER_URL}/api/auth/callback/google`,
+			},
+		}),
+		...(isGithubEnabled && {
+			github: {
+				clientId: GITHUB_CLIENT_ID as string,
+				clientSecret: GITHUB_CLIENT_SECRET as string,
+				scope: ["read:user", "user:email"],
+				redirectURI: `${SERVER_URL}/api/auth/callback/github`,
+			},
+		}),
 	},
+
 	hooks: {
 		before: createAuthMiddleware(async (ctx) => {
 			// Check for email/password signup
@@ -87,7 +92,7 @@ export const auth = betterAuth({
 				const body = ctx.body;
 				const email = body?.email;
 
-				if (email && typeof email === "string") {
+				if (email && typeof email === "string" && FRAUD_CHECK_API_URL) {
 					try {
 						// Step 1: Check the full email first
 						const emailResponse = await fetch(
@@ -387,48 +392,50 @@ export const auth = betterAuth({
 			}
 		}),
 	},
-	emailAndPassword: {
-		enabled: true,
-		autoSignIn: false,
-		requireEmailVerification: true,
-		async sendResetPassword({ user, url, token }, request) {
-			try {
-				await sendPasswordResetEmail(user, url);
-			} catch (error) {
-				console.error("Failed to send password reset email:", error);
-				Sentry.captureException(error, {
-					tags: { feature: "auth", operation: "send-reset-email" },
-					user: { id: user.id, email: user.email },
-					extra: { url },
-				});
-				throw error; // Re-throw so Better Auth knows it failed
-			}
+
+	// Conditionally enable Email & Password
+	...(EMAIL_PASSWORD_ENABLED && {
+		emailAndPassword: {
+			enabled: true,
+			autoSignIn: false,
+			requireEmailVerification: true,
+			async sendResetPassword({ user, url, token }, request) {
+				try {
+					await sendPasswordResetEmail(user, url);
+				} catch (error) {
+					console.error("Failed to send password reset email:", error);
+					Sentry.captureException(error, {
+						tags: { feature: "auth", operation: "send-reset-email" },
+						user: { id: user.id, email: user.email },
+						extra: { url },
+					});
+					throw error; // Re-throw so Better Auth knows it failed
+				}
+			},
+			password: {},
+			resetPasswordTokenExpiresIn: TOKEN_EXPIRATION_SECONDS,
 		},
-		password: {},
-		resetPasswordTokenExpiresIn: TOKEN_EXPIRATION_SECONDS,
-	},
-	emailVerification: {
-		sendOnSignUp: true,
-		autoSignInAfterVerification: false,
-		async sendVerificationEmail({ user, url }) {
-			try {
-				// The 'url' parameter already contains the full verification URL
-				// with the callbackURL from the client included as a query parameter.
-				// We just need to use it directly.
-				console.log("The verification URL is", url);
-				await sendVerificationEmail(user, url);
-			} catch (error) {
-				console.error("Failed to send verification email:", error);
-				Sentry.captureException(error, {
-					tags: { feature: "auth", operation: "send-verification-email" },
-					user: { id: user.id, email: user.email },
-					extra: { url },
-				});
-				throw error; // Re-throw so Better Auth knows it failed
-			}
+		emailVerification: {
+			sendOnSignUp: true,
+			autoSignInAfterVerification: false,
+			async sendVerificationEmail({ user, url }) {
+				try {
+					console.log("The verification URL is", url);
+					await sendVerificationEmail(user, url);
+				} catch (error) {
+					console.error("Failed to send verification email:", error);
+					Sentry.captureException(error, {
+						tags: { feature: "auth", operation: "send-verification-email" },
+						user: { id: user.id, email: user.email },
+						extra: { url },
+					});
+					throw error; // Re-throw so Better Auth knows it failed
+				}
+			},
+			expiresIn: TOKEN_EXPIRATION_SECONDS,
 		},
-		expiresIn: TOKEN_EXPIRATION_SECONDS,
-	},
+	}),
+
 	plugins: [
 		openAPI(),
 		passkey({
@@ -508,7 +515,7 @@ export const auth = betterAuth({
 		},
 	},
 
-	// Added Custom table names for Drizzle ORM and avoiding better auth default
+	// Custom table names for Core Drizzle ORM models
 	user: {
 		modelName: "users",
 	},
@@ -521,17 +528,12 @@ export const auth = betterAuth({
 	verification: {
 		modelName: "verifications",
 	},
-	twoFactor: {
-		modelName: "twoFactors",
-	},
-	jwk: {
-		modelName: "jwks",
-	},
+
 	database: drizzleAdapter(db, {
 		provider: "pg",
 		schema: {
-			users: schema.users, // not user:
-			sessions: schema.sessions, // not session:
+			users: schema.users,
+			sessions: schema.sessions,
 			accounts: schema.accounts,
 			verifications: schema.verifications,
 			twoFactors: schema.twoFactors,
