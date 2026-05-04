@@ -10,7 +10,11 @@ import { and, eq, ilike, inArray, not, or } from "drizzle-orm";
 import { getAllowedOrigins } from "./config/app.config";
 import { db } from "./db";
 import * as schema from "./db/schema";
-import { sendPasswordResetEmail, sendVerificationEmail } from "./lib/email";
+import {
+	sendChangeEmailConfirmationEmail,
+	sendPasswordResetEmail,
+	sendVerificationEmail,
+} from "./lib/email";
 
 const allowedOrigins = getAllowedOrigins();
 
@@ -518,7 +522,26 @@ export const auth = betterAuth({
 	// Custom table names for Core Drizzle ORM models
 	user: {
 		modelName: "users",
+		...(EMAIL_PASSWORD_ENABLED && {
+			changeEmail: {
+				enabled: true,
+				sendChangeEmailConfirmation: async ({ user, newEmail, url }) => {
+					try {
+						await sendChangeEmailConfirmationEmail(user, newEmail, url);
+					} catch (error) {
+						console.error("Failed to send change email confirmation:", error);
+						Sentry.captureException(error, {
+							tags: { feature: "auth", operation: "send-change-email-confirmation" },
+							user: { id: user.id, email: user.email },
+							extra: { url, newEmail },
+						});
+						throw error;
+					}
+				},
+			},
+		}),
 	},
+
 	session: {
 		modelName: "sessions",
 	},
