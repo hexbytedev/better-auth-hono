@@ -211,3 +211,38 @@ export async function sendPasswordResetEmail(user: User, resetUrl: string) {
 	const html = getEmailTemplate(subject, bodyContent, footerContent);
 	return sendEmail("password-reset", user.email, subject, html);
 }
+
+/**
+ * Sends a change email confirmation to the user's current email
+ * @param user - User object containing email and optional name
+ * @param newEmail - The new email address requested
+ * @param confirmationUrl - The URL to approve the email change
+ * @returns Promise with the email service response
+ */
+export async function sendChangeEmailConfirmationEmail(
+	user: User,
+	newEmail: string,
+	confirmationUrl: string,
+) {
+	const subject = "Approve email change";
+
+	const bodyContent = `
+		<p>Hello ${user.name || "there"},</p>
+		<p>We received a request to change the email address for your <strong>${COMPANY_NAME}</strong> account to <strong>${newEmail}</strong>. Please approve this change by clicking the button below.</p>
+		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 10px; margin-bottom: 10px;">
+			<tr>
+				<td align="left">
+					<a href="${confirmationUrl}" style="background-color: ${PRIMARY_COLOR}; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid ${PRIMARY_COLOR};">Approve Email Change</a>
+				</td>
+			</tr>
+		</table>
+		<p style="font-size: 14px; color: #71717a;">This link will expire in ${formatExpirationTime(TOKEN_EXPIRATION_SECONDS)}.</p>
+	`;
+
+	const footerContent = `
+		If you didn't request an email change, please ignore this email and your account email will remain unchanged.
+	`;
+
+	const html = getEmailTemplate(subject, bodyContent, footerContent);
+	return sendEmail("change-email-confirmation", user.email, subject, html);
+}

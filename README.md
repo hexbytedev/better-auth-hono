@@ -15,6 +15,23 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 - JWT support for microservices (`src/auth.ts`) and an internal Basic‑Auth protected user lookup API (`/api/users/*`).
 - Sign up fraud mitigation: domain/email/IP checks against an external fraud service to reduce abuse.
 
+## Features at a Glance
+
+| Feature | Description | Included |
+| :--- | :--- | :---: |
+| **Passkeys** | Modern WebAuthn/Biometric authentication | ✅ |
+| **Two-Factor (2FA)** | Multi-factor authentication via TOTP | ✅ |
+| **Social OAuth** | Login via Google and GitHub providers | ✅ |
+| **Email & Password** | Traditional credentials with verification & reset | ✅ |
+| **JWT Support** | Stateless tokens for microservice authentication | ✅ |
+| **Internal User API** | **Custom** Basic-Auth protected lookup (ID/Email) | ✅ |
+| **Signup Protection** | **Custom** Fraud checks for Email, Domain, and IP | ✅ |
+| **OpenAPI/Swagger** | Automated API documentation and reference | ✅ |
+| **Docker Support** | Optimized production-ready container images | ✅ |
+| **Database ORM** | Drizzle with UUID v7 and optimized indexing | ✅ |
+| **Sentry Monitoring** | Structured error tracking and performance metrics | ✅ |
+| **Code Quality** | Biome linting/formatting and Husky git hooks | ✅ |
+
 ## Deployment to the production cloud
 
 - Copy `.env.sample` to `.env.local` and fill in secrets.
