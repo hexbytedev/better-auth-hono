@@ -8,12 +8,14 @@ on:
       - '**/*.js'
       - 'package.json'
       - 'bun.lock'
+      - '.github/workflows/*.yml'
   pull_request:
     paths:
       - '**/*.ts'
       - '**/*.js'
       - 'package.json'
       - 'bun.lock'
+      - '.github/workflows/*.yml'
 
 # Prevents multiple workflow runs for the same ref/PR
 concurrency:
