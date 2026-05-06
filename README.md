@@ -59,6 +59,7 @@ This project uses Husky for Git hooks to ensure code quality:
 - **Commit-msg hook**: Validates commit messages (minimum 10 characters)
 
 To manually run linting and formatting:
+
 - `bun run lint` - Lint and auto-fix issues
 - `bun run lint:check` - Check for issues without fixing
 - `bun run format` - Format code

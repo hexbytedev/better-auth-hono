@@ -1,7 +1,7 @@
 ##############################
 # ---------- Base ---------- #
 ##############################
-FROM oven/bun:1.3.6 AS base
+FROM oven/bun:1.3.13 AS base
 
 WORKDIR /app
 
@@ -32,7 +32,7 @@ CMD ["bunx", "drizzle-kit", "push"]
 ##############################
 # --------- Runner --------- #
 ##############################
-FROM oven/bun:1.3.6 AS runner
+FROM oven/bun:1.3.13 AS runner
 
 WORKDIR /app
 
