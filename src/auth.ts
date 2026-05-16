@@ -419,11 +419,16 @@ export const auth = betterAuth({
 			password: {},
 			resetPasswordTokenExpiresIn: TOKEN_EXPIRATION_SECONDS,
 		},
+	}),
+
+	...(EMAIL_PASSWORD_ENABLED && {
 		emailVerification: {
 			sendOnSignUp: true,
+			sendOnSignIn: false, // Don't send on every sign-in attempt
 			autoSignInAfterVerification: false,
 			async sendVerificationEmail({ user, url }) {
 				try {
+					console.log(`[${new Date().toISOString()}] Sending verification email to ${user.email}`);
 					console.log("The verification URL is", url);
 					await sendVerificationEmail(user, url);
 				} catch (error) {
