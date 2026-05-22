@@ -8,8 +8,14 @@ import { getUserByEmail, getUserById } from "../services/user.service";
 
 const usersRoute = new Hono();
 
+function maskEmail(email: string): string {
+	const [localPart, domain] = email.split("@");
+	if (!localPart || !domain) return "[redacted-email]";
+	return `${localPart.slice(0, 2)}***@${domain}`;
+}
+
 // Validation schemas
-const emailSchema = z.object({
+const emailBodySchema = z.object({
 	email: z.email("Invalid email format"),
 });
 
@@ -18,12 +24,12 @@ const userIdSchema = z.object({
 });
 
 /**
- * GET /api/users/email/:email
+ * POST /api/users/email
  * Fetch user information by email address
  * Protected by Basic Authentication
  *
- * @route GET /api/users/email/:email
- * @param {string} email - User's email address (must be valid email format)
+ * @route POST /api/users/email
+ * @body {string} email - User's email address (must be valid email format)
  * @header {string} Authorization - Required Basic Auth header (format: "Basic base64(username:password)")
  *
  * @returns {200} Success Response
@@ -46,7 +52,7 @@ const userIdSchema = z.object({
  * {
  *   "success": false,
  *   "error": "User not found",
- *   "message": "No user found with email: user@example.com"
+ *   "message": "No matching user found"
  * }
  * ```
  *
@@ -54,9 +60,11 @@ const userIdSchema = z.object({
  * @returns {400} Bad Request - Invalid email format
  * @returns {500} Internal Server Error - Database or system error
  */
-usersRoute.get("/email/:email", validateBasicAuth, zValidator("param", emailSchema), async (c) => {
+usersRoute.post("/email", validateBasicAuth, zValidator("json", emailBodySchema), async (c) => {
+	const requestBody = c.req.valid("json");
+
 	try {
-		const { email } = c.req.param();
+		const { email } = requestBody;
 
 		// Get user data using service function
 		const user = await getUserByEmail(email);
@@ -66,7 +74,7 @@ usersRoute.get("/email/:email", validateBasicAuth, zValidator("param", emailSche
 				{
 					success: false,
 					error: "User not found",
-					message: `No user found with email: ${email}`,
+					message: "No matching user found",
 				},
 				404,
 			);
@@ -80,20 +88,16 @@ usersRoute.get("/email/:email", validateBasicAuth, zValidator("param", emailSche
 	} catch (error) {
 		console.error("Error in /email route:", error);
 
-		// Set user context for Sentry
-		Sentry.setUser({ email: c.req.param("email") });
-
 		// Send to Sentry with rich context
 		Sentry.captureException(error, {
 			tags: {
 				feature: "user-api",
 				route: "get-user-by-email",
-				method: "GET",
+				method: "POST",
 			},
 			extra: {
-				email: c.req.param("email"),
+				email: maskEmail(requestBody.email),
 				userAgent: c.req.header("user-agent"),
-				ip: c.req.header("x-forwarded-for") || "unknown",
 			},
 			level: "error",
 		});
@@ -172,9 +176,6 @@ usersRoute.get("/id/:id", validateBasicAuth, zValidator("param", userIdSchema), 
 	} catch (error) {
 		console.error("Error in /id route:", error);
 
-		// Set user context for Sentry
-		Sentry.setUser({ id: c.req.param("id") });
-
 		// Send to Sentry with rich context
 		Sentry.captureException(error, {
 			tags: {
@@ -185,7 +186,6 @@ usersRoute.get("/id/:id", validateBasicAuth, zValidator("param", userIdSchema), 
 			extra: {
 				userId: c.req.param("id"),
 				userAgent: c.req.header("user-agent"),
-				ip: c.req.header("x-forwarded-for") || "unknown",
 			},
 			level: "error",
 		});

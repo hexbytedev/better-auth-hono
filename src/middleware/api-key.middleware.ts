@@ -8,6 +8,17 @@ const AUTH_PASS = process.env.API_AUTH_PASSWORD?.trim();
 // Check if Basic Auth is enabled
 export const isBasicAuthEnabled = !!(AUTH_USER && AUTH_PASS);
 
+function safeCompare(a: string, b: string): boolean {
+	const bufA = Buffer.from(a);
+	const bufB = Buffer.from(b);
+
+	if (bufA.length !== bufB.length) {
+		return false;
+	}
+
+	return timingSafeEqual(bufA, bufB);
+}
+
 /**
  * Validates HTTP Basic Auth (Username & Password)
  * If credentials are not configured, this middleware will be skipped
@@ -29,7 +40,7 @@ export const validateBasicAuth = async (c: Context, next: Next) => {
 			{
 				success: false,
 				error: "Unauthorized",
-				message: "Authorization header is missing.",
+				message: "Authentication required.",
 			},
 			401,
 		);
@@ -39,11 +50,12 @@ export const validateBasicAuth = async (c: Context, next: Next) => {
 	const [scheme, token] = authHeader.split(" ");
 
 	if (!scheme || !token || scheme.toLowerCase() !== "basic") {
+		c.header("WWW-Authenticate", 'Basic realm="API Access"');
 		return c.json(
 			{
 				success: false,
 				error: "Unauthorized",
-				message: "Invalid authentication scheme. Use 'Basic <token>'.",
+				message: "Authentication required.",
 			},
 			401,
 		);
@@ -53,29 +65,33 @@ export const validateBasicAuth = async (c: Context, next: Next) => {
 	try {
 		// Decode Base64 string "username:password"
 		const credentials = Buffer.from(token, "base64").toString("utf-8");
-		const [username, password] = credentials.split(":");
+		const separatorIndex = credentials.indexOf(":");
 
-		// Compare with Environment Variables safely
-		const safeCompare = (a: string, b: string) => {
-			const bufA = Buffer.from(a ?? "");
-			const bufB = Buffer.from(b ?? "");
+		if (separatorIndex === -1) {
+			return c.json(
+				{
+					success: false,
+					error: "Bad Request",
+					message: "Invalid authentication token format.",
+				},
+				400,
+			);
+		}
 
-			if (bufA.length !== bufB.length) {
-				return false;
-			}
-			return timingSafeEqual(bufA, bufB);
-		};
+		const username = credentials.slice(0, separatorIndex);
+		const password = credentials.slice(separatorIndex + 1);
 
 		if (!safeCompare(username, AUTH_USER!) || !safeCompare(password, AUTH_PASS!)) {
 			console.warn(
 				`[Security] Failed login attempt from IP: ${c.req.header("x-forwarded-for") || "unknown"}`,
 			);
 
+			c.header("WWW-Authenticate", 'Basic realm="API Access"');
 			return c.json(
 				{
 					success: false,
 					error: "Unauthorized",
-					message: "Invalid username or password.",
+					message: "Invalid authentication credentials.",
 				},
 				401,
 			);

@@ -120,8 +120,8 @@ app.get("/", (c) => {
 				href: new URL("/api/users/id/:id", baseUrl).href,
 			},
 			{
-				text: "User API - Get by Email (Requires Basic Auth)",
-				href: new URL("/api/users/email/:email", baseUrl).href,
+				text: "User API - Get by Email (POST, Requires Basic Auth)",
+				href: new URL("/api/users/email", baseUrl).href,
 			},
 		);
 	}
@@ -131,17 +131,6 @@ app.get("/", (c) => {
 		description: "This is a simple example of a Hono x Better Auth application.",
 		basicAuth: isBasicAuthEnabled ? "enabled" : "disabled",
 		links,
-	});
-});
-
-// --- Debug endpoint ---
-app.get("/debug-origins", (c) => {
-	return c.json({
-		allowedOrigins: getAllowedOrigins(),
-		appPort: getAppPort(),
-		appHost: getAppHost(),
-		clientUrl: process.env.CLIENT_URL?.trim(),
-		rawAllowedOrigins: process.env.ALLOWED_ORIGINS?.trim(),
 	});
 });
 

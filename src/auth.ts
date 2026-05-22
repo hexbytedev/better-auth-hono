@@ -17,6 +17,29 @@ import {
 	sendVerificationEmail,
 } from "./lib/email";
 
+const OUTBOUND_REQUEST_TIMEOUT_MS = 5000;
+
+function maskEmail(email: string): string {
+	const [localPart, domain] = email.split("@");
+	if (!localPart || !domain) return "[redacted-email]";
+	return `${localPart.slice(0, 2)}***@${domain}`;
+}
+
+function maskIpAddress(ip: string): string {
+	if (!ip || ip === "unknown") return "unknown";
+	if (ip.includes(":")) {
+		const segments = ip.split(":");
+		return `${segments.slice(0, 2).join(":")}:****`;
+	}
+	const octets = ip.split(".");
+	if (octets.length !== 4) return "[redacted-ip]";
+	return `${octets[0]}.${octets[1]}.x.x`;
+}
+
+function getRequestSignal(): AbortSignal {
+	return AbortSignal.timeout(OUTBOUND_REQUEST_TIMEOUT_MS);
+}
+
 const allowedOrigins = getAllowedOrigins();
 
 const SERVER_URL = process.env.BETTER_AUTH_SERVER_URL?.trim();
@@ -112,6 +135,8 @@ export const auth = betterAuth({
 							`${FRAUD_CHECK_API_URL}/email/${encodeURIComponent(email)}`,
 							{
 								method: "GET",
+								signal: getRequestSignal(),
+								redirect: "error",
 								headers: {
 									"User-Agent": "better-auth-app",
 								},
@@ -122,7 +147,7 @@ export const auth = betterAuth({
 							// Email is valid, proceed to next checks
 						} else {
 							// Email check failed, throw error immediately
-							console.log(`Email fraud check failed for email: ${email}`);
+							console.log(`Email fraud check failed for email: ${maskEmail(email)}`);
 							throw new APIError("BAD_REQUEST", {
 								code: "EMAIL_NOT_ALLOWED",
 								message: "The email address is not allowed. Please use a different email address.",
@@ -146,7 +171,7 @@ export const auth = betterAuth({
 							}
 						}
 
-						console.log(`Checking IP: ${clientIP} for email: ${email}`);
+						console.log(`Checking IP: ${maskIpAddress(clientIP)} for email: ${maskEmail(email)}`);
 
 						if (clientIP && clientIP !== "unknown") {
 							try {
@@ -154,6 +179,8 @@ export const auth = betterAuth({
 									`${FRAUD_CHECK_API_URL}/ip/${encodeURIComponent(clientIP)}`,
 									{
 										method: "GET",
+										signal: getRequestSignal(),
+										redirect: "error",
 										headers: {
 											"User-Agent": "better-auth-app",
 										},
@@ -165,7 +192,7 @@ export const auth = betterAuth({
 									const security = ipData?.security;
 
 									if (security && security.is_threat === true) {
-										console.log(`IP fraud check failed for IP: ${clientIP}`, {
+										console.log(`IP fraud check failed for IP: ${maskIpAddress(clientIP)}`, {
 											is_threat: security.is_threat,
 										});
 										throw new APIError("FORBIDDEN", {
@@ -175,7 +202,9 @@ export const auth = betterAuth({
 									}
 								} else {
 									// IP check API returned non-200, log but don't block
-									console.log(`IP check API returned ${ipResponse.status} for IP: ${clientIP}`);
+									console.log(
+										`IP check API returned ${ipResponse.status} for IP: ${maskIpAddress(clientIP)}`,
+									);
 								}
 							} catch (ipError) {
 								if (ipError instanceof APIError) {
@@ -185,12 +214,15 @@ export const auth = betterAuth({
 								console.error("IP fraud check API error:", ipError);
 								Sentry.captureException(ipError, {
 									tags: { feature: "fraud-check", operation: "ip-check-error" },
-									extra: { clientIP, email },
+									extra: {
+										clientIP: maskIpAddress(clientIP),
+										email: maskEmail(email),
+									},
 									level: "warning",
 								});
 							}
 						} else {
-							console.log(`Could not determine client IP for email: ${email}`);
+							console.log(`Could not determine client IP for email: ${maskEmail(email)}`);
 						}
 
 						// All checks passed, allow registration
@@ -204,7 +236,7 @@ export const auth = betterAuth({
 						console.error("Fraud check API error:", error);
 						Sentry.captureException(error, {
 							tags: { feature: "fraud-check", operation: "api-error" },
-							extra: { email },
+							extra: { email: maskEmail(email) },
 							level: "error",
 						});
 
@@ -245,11 +277,12 @@ export const auth = betterAuth({
 						"User-Agent": "better-auth-app",
 					},
 					cache: "no-store",
+					signal: getRequestSignal(),
+					redirect: "error",
 				});
 
 				if (!res.ok) {
-					const text = await res.text().catch(() => "");
-					console.error("[hooks.after] GitHub API error", res.status, text);
+					console.error("[hooks.after] GitHub API error", res.status);
 
 					// Capture GitHub API errors in Sentry
 					Sentry.captureException(new Error(`GitHub API error: ${res.status}`), {
@@ -259,7 +292,6 @@ export const auth = betterAuth({
 						},
 						extra: {
 							status: res.status,
-							response: text,
 							userId,
 						},
 					});
@@ -365,11 +397,6 @@ export const auth = betterAuth({
 						});
 					}
 				}
-
-				console.log(
-					"Verified reachable GitHub emails:",
-					filtered.map((e) => e.email),
-				);
 			} catch (e) {
 				console.error("[hooks.after] Failed to fetch/log GitHub emails:", e);
 				Sentry.captureException(e, {
@@ -394,8 +421,8 @@ export const auth = betterAuth({
 					console.error("Failed to send password reset email:", error);
 					Sentry.captureException(error, {
 						tags: { feature: "auth", operation: "send-reset-email" },
-						user: { id: user.id, email: user.email },
-						extra: { url },
+						user: { id: user.id },
+						extra: { urlPath: new URL(url).pathname },
 					});
 					throw error; // Re-throw so Better Auth knows it failed
 				}
@@ -416,7 +443,7 @@ export const auth = betterAuth({
 				} catch (error) {
 					Sentry.captureException(error, {
 						tags: { feature: "auth", operation: "send-verification-email" },
-						user: { id: user.id, email: user.email },
+						user: { id: user.id },
 					});
 					throw error;
 				}
@@ -518,8 +545,11 @@ export const auth = betterAuth({
 						console.error("Failed to send change email confirmation:", error);
 						Sentry.captureException(error, {
 							tags: { feature: "auth", operation: "send-change-email-confirmation" },
-							user: { id: user.id, email: user.email },
-							extra: { url, newEmail },
+							user: { id: user.id },
+							extra: {
+								urlPath: new URL(url).pathname,
+								newEmail: maskEmail(newEmail),
+							},
 						});
 						throw error;
 					}

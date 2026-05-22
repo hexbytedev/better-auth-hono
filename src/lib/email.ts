@@ -45,6 +45,19 @@ function formatExpirationTime(seconds: number): string {
 	return `${seconds} second${seconds > 1 ? "s" : ""}`;
 }
 
+function escapeHtml(value: string): string {
+	return value
+		.replaceAll("&", "&amp;")
+		.replaceAll("<", "&lt;")
+		.replaceAll(">", "&gt;")
+		.replaceAll('"', "&quot;")
+		.replaceAll("'", "&#39;");
+}
+
+function escapeHtmlAttribute(value: string): string {
+	return escapeHtml(value);
+}
+
 interface User {
 	email: string;
 	name?: string;
@@ -160,14 +173,17 @@ function getEmailTemplate(title: string, bodyContent: string, footerContent: str
  */
 export async function sendVerificationEmail(user: User, verificationUrl: string) {
 	const subject = "Verify your email address";
+	const safeName = escapeHtml(user.name || "there");
+	const safeCompanyName = escapeHtml(COMPANY_NAME);
+	const safeVerificationUrl = escapeHtmlAttribute(verificationUrl);
 
 	const bodyContent = `
-		<p>Hello ${user.name || "there"},</p>
-		<p>Thank you for signing up with <strong>${COMPANY_NAME}</strong>. To complete your registration and secure your account, please verify your email address.</p>
+		<p>Hello ${safeName},</p>
+		<p>Thank you for signing up with <strong>${safeCompanyName}</strong>. To complete your registration and secure your account, please verify your email address.</p>
 		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 10px; margin-bottom: 10px;">
 			<tr>
 				<td align="left">
-					<a href="${verificationUrl}" style="background-color: ${PRIMARY_COLOR}; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid ${PRIMARY_COLOR};">Verify Email Address</a>
+					<a href="${safeVerificationUrl}" style="background-color: ${PRIMARY_COLOR}; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid ${PRIMARY_COLOR};">Verify Email Address</a>
 				</td>
 			</tr>
 		</table>
@@ -190,14 +206,17 @@ export async function sendVerificationEmail(user: User, verificationUrl: string)
  */
 export async function sendPasswordResetEmail(user: User, resetUrl: string) {
 	const subject = "Reset your password";
+	const safeName = escapeHtml(user.name || "there");
+	const safeCompanyName = escapeHtml(COMPANY_NAME);
+	const safeResetUrl = escapeHtmlAttribute(resetUrl);
 
 	const bodyContent = `
-		<p>Hello ${user.name || "there"},</p>
-		<p>We received a request to reset the password for your <strong>${COMPANY_NAME}</strong> account. You can set a new password by clicking the button below.</p>
+		<p>Hello ${safeName},</p>
+		<p>We received a request to reset the password for your <strong>${safeCompanyName}</strong> account. You can set a new password by clicking the button below.</p>
 		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 10px; margin-bottom: 10px;">
 			<tr>
 				<td align="left">
-					<a href="${resetUrl}" style="background-color: ${PRIMARY_COLOR}; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid ${PRIMARY_COLOR};">Reset Password</a>
+					<a href="${safeResetUrl}" style="background-color: ${PRIMARY_COLOR}; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid ${PRIMARY_COLOR};">Reset Password</a>
 				</td>
 			</tr>
 		</table>
@@ -225,14 +244,18 @@ export async function sendChangeEmailConfirmationEmail(
 	confirmationUrl: string,
 ) {
 	const subject = "Approve email change";
+	const safeName = escapeHtml(user.name || "there");
+	const safeCompanyName = escapeHtml(COMPANY_NAME);
+	const safeNewEmail = escapeHtml(newEmail);
+	const safeConfirmationUrl = escapeHtmlAttribute(confirmationUrl);
 
 	const bodyContent = `
-		<p>Hello ${user.name || "there"},</p>
-		<p>We received a request to change the email address for your <strong>${COMPANY_NAME}</strong> account to <strong>${newEmail}</strong>. Please approve this change by clicking the button below.</p>
+		<p>Hello ${safeName},</p>
+		<p>We received a request to change the email address for your <strong>${safeCompanyName}</strong> account to <strong>${safeNewEmail}</strong>. Please approve this change by clicking the button below.</p>
 		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 10px; margin-bottom: 10px;">
 			<tr>
 				<td align="left">
-					<a href="${confirmationUrl}" style="background-color: ${PRIMARY_COLOR}; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid ${PRIMARY_COLOR};">Approve Email Change</a>
+					<a href="${safeConfirmationUrl}" style="background-color: ${PRIMARY_COLOR}; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid ${PRIMARY_COLOR};">Approve Email Change</a>
 				</td>
 			</tr>
 		</table>

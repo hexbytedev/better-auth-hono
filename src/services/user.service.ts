@@ -6,6 +6,12 @@ import { z } from "zod";
 import { db } from "../db";
 import { users } from "../db/schema";
 
+function maskEmail(email: string): string {
+	const [localPart, domain] = email.split("@");
+	if (!localPart || !domain) return "[redacted-email]";
+	return `${localPart.slice(0, 2)}***@${domain}`;
+}
+
 /**
  * User Response Schema - Controls what data is returned to clients
  * Only exposes safe, necessary user information
@@ -21,10 +27,19 @@ export const UserResponseSchema = z.object({
 
 export type UserResponse = z.infer<typeof UserResponseSchema>;
 
+type SafeUserRow = {
+	id: string;
+	email: string;
+	name: string | null;
+	image: string | null;
+	emailVerified: boolean;
+	twoFactorEnabled: boolean;
+};
+
 /**
  * Transform database user to safe response format
  */
-function transformUserToResponse(dbUser: any): UserResponse {
+function transformUserToResponse(dbUser: SafeUserRow): UserResponse {
 	return {
 		id: dbUser.id,
 		email: dbUser.email,
@@ -81,7 +96,7 @@ export async function getUserByEmail(email: string): Promise<UserResponse | null
 				table: "users",
 			},
 			extra: {
-				email,
+				email: maskEmail(email),
 				query: "SELECT user by email",
 				database: "postgresql",
 			},
