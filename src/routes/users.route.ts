@@ -3,16 +3,11 @@ import { zValidator } from "@hono/zod-validator";
 import * as Sentry from "@sentry/bun";
 import { Hono } from "hono";
 import { z } from "zod";
+import { maskEmail } from "../lib/redaction";
 import { validateBasicAuth } from "../middleware/api-key.middleware";
 import { getUserByEmail, getUserById } from "../services/user.service";
 
 const usersRoute = new Hono();
-
-function maskEmail(email: string): string {
-	const [localPart, domain] = email.split("@");
-	if (!localPart || !domain) return "[redacted-email]";
-	return `${localPart.slice(0, 2)}***@${domain}`;
-}
 
 // Validation schemas
 const emailBodySchema = z.object({

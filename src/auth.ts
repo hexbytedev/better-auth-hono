@@ -16,14 +16,9 @@ import {
 	sendPasswordResetEmail,
 	sendVerificationEmail,
 } from "./lib/email";
+import { maskEmail } from "./lib/redaction";
 
 const OUTBOUND_REQUEST_TIMEOUT_MS = 5000;
-
-function maskEmail(email: string): string {
-	const [localPart, domain] = email.split("@");
-	if (!localPart || !domain) return "[redacted-email]";
-	return `${localPart.slice(0, 2)}***@${domain}`;
-}
 
 function maskIpAddress(ip: string): string {
 	if (!ip || ip === "unknown") return "unknown";

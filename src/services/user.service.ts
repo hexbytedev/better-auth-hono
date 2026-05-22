@@ -5,12 +5,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db";
 import { users } from "../db/schema";
-
-function maskEmail(email: string): string {
-	const [localPart, domain] = email.split("@");
-	if (!localPart || !domain) return "[redacted-email]";
-	return `${localPart.slice(0, 2)}***@${domain}`;
-}
+import { maskEmail } from "../lib/redaction";
 
 /**
  * User Response Schema - Controls what data is returned to clients
