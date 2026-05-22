@@ -1,0 +1,67 @@
+{
+	"$schema": "https://opencode.ai/config.json",
+	"command": {
+		"lint": {
+			"template": "bun run lint",
+			"description": "Run Biome linter (writes fixes)"
+		},
+		"format": {
+			"template": "bun run format",
+			"description": "Run Biome formatter"
+		},
+		"build": {
+			"template": "bun run build",
+			"description": "Build the Bun app into dist/"
+		},
+		"start": {
+			"template": "bun run start",
+			"description": "Run built production bundle"
+		},
+		"test": {
+			"template": "bun test",
+			"description": "Run all tests with Bun (if tests exist)"
+		},
+		"test:singleFile": {
+			"template": "bun test {file}",
+			"description": "Run a single test file (use full path)"
+		},
+		"test:singleName": {
+			"template": "bun test -t \"{name}\"",
+			"description": "Run a single test by test name"
+		}
+	},
+	"watcher": {
+		"ignore": ["dist/**", "node_modules/**", ".env*", "drizzle/**"]
+	},
+	"formatter": {
+		"biome": {
+			"command": ["bun run format"],
+			"extensions": [".ts", ".js"],
+			"disabled": false
+		}
+	},
+	"experimental": {
+		"hook": {
+			"file_edited": {
+				"**/*.ts": [
+					{
+						"command": ["bun run format", "bun run lint"],
+						"environment": {}
+					}
+				],
+				"**/*.js": [
+					{
+						"command": ["bun run format", "bun run lint"],
+						"environment": {}
+					}
+				]
+			},
+			"session_completed": [
+				{
+					"command": ["bun run lint", "bun test", "bun run build"],
+					"environment": {}
+				}
+			]
+		}
+	}
+}
