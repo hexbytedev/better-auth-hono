@@ -16,7 +16,7 @@
     "@better-auth/drizzle-adapter": "^1.6.11",
     "@better-auth/expo": "^1.6.11",
     "@better-auth/passkey": "^1.6.11",
-    "@hono/zod-validator": "^0.7.6",
+    "@hono/zod-validator": "^0.8.0",
     "@sentry/bun": "^10.53.1",
     "better-auth": "^1.6.11",
     "dotenv": "^17.4.2",
