@@ -1,6 +1,7 @@
 // auth.ts
 
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
+import { expo } from "@better-auth/expo";
 import { passkey } from "@better-auth/passkey";
 import * as Sentry from "@sentry/bun";
 import { betterAuth } from "better-auth";
@@ -67,7 +68,15 @@ const EMAIL_PASSWORD_ENABLED = process.env.EMAIL_PASSWORD_ENABLED?.trim() !== "f
 
 export const auth = betterAuth({
 	baseURL: SERVER_URL,
-	trustedOrigins: allowedOrigins,
+	trustedOrigins: [
+		...allowedOrigins,
+		// Expo app scheme for deep link authentication
+		...(process.env.APP_SCHEME ? [`${process.env.APP_SCHEME}://`] : []),
+		// Development mode - Expo's exp:// scheme with local IP ranges
+		...(process.env.NODE_ENV === "development"
+			? ["exp://", "exp://**", "exp://192.168.*.*:*/**"]
+			: []),
+	],
 	secret: BETTER_AUTH_SECRET,
 
 	// Conditionally add Social Providers
@@ -427,6 +436,7 @@ export const auth = betterAuth({
 	}),
 
 	plugins: [
+		expo(),
 		openAPI(),
 		passkey({
 			schema: {
