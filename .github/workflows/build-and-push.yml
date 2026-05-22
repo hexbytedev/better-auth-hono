@@ -79,7 +79,7 @@ jobs:
 
       - name: 🚀 Build and push runner image
         if: ${{ steps.set-tag.outputs.tags != '' }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
@@ -92,7 +92,7 @@ jobs:
 
       - name: 🛠️ Build and push migration image
         if: ${{ steps.set-tag.outputs.migrate_tags != '' }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
