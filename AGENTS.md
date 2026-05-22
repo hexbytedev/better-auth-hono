@@ -19,7 +19,8 @@
 ## Required Environment
 
 - Many env vars are required at module import (app fails fast).
-- See `README.md` for the authoritative list and `.env.sample` template.
+- Use `.env.sample` as the authoritative env template; use `README.md` for deployment and workflow notes.
+- `drizzle.config.ts` explicitly loads `.env.local`, so Drizzle commands require explicit permission before reading that ignored file.
 
 ## Commands (Bun)
 
@@ -44,18 +45,19 @@ Lint/Format
 
 DB (Drizzle)
 
-- `bunx drizzle-kit generate`
-- `bunx drizzle-kit push`
+- `bun run generate` (wrapper for `bunx drizzle-kit generate`)
+- `bun run push` (wrapper for `bunx drizzle-kit push`)
 
 Tests
 
-- No test runner configured in `package.json`.
+- No `test` script is configured in `package.json`.
 - If adding tests, prefer Bun test (`bun test`) and update this file with
   single-test examples (e.g., `bun test path/to/file.test.ts`).
 
 CI
 
-- GitHub Actions runs `bun run lint` and `bun audit --audit-level=high`.
+- GitHub Actions runs a lint workflow with `bun run lint` and `bun audit --audit-level=high`.
+- A separate workflow builds and pushes Docker images on tag pushes or manual `workflow_dispatch`.
 
 ## Code Style Guidelines
 
@@ -150,7 +152,9 @@ CI
 
 - `package.json` for scripts and dependencies.
 - `biome.json` for lint/format rules.
-- `README.md` for envs and workflow details.
+- `.env.sample` for required environment variables and defaults.
+- `drizzle.config.ts` for Drizzle env-loading behavior.
+- `README.md` for deployment and workflow details.
 
 ## Working Agreements for Agents
 

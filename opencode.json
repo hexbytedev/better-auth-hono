@@ -22,11 +22,11 @@
 			"description": "Run all tests with Bun (if tests exist)"
 		},
 		"test:singleFile": {
-			"template": "bun test {file}",
+			"template": "bun test $ARGUMENTS",
 			"description": "Run a single test file (use full path)"
 		},
 		"test:singleName": {
-			"template": "bun test -t \"{name}\"",
+			"template": "bun test -t \"$ARGUMENTS\"",
 			"description": "Run a single test by test name"
 		}
 	},
@@ -34,34 +34,6 @@
 		"ignore": ["dist/**", "node_modules/**", ".env*", "drizzle/**"]
 	},
 	"formatter": {
-		"biome": {
-			"command": ["bun run format"],
-			"extensions": [".ts", ".js"],
-			"disabled": false
-		}
-	},
-	"experimental": {
-		"hook": {
-			"file_edited": {
-				"**/*.ts": [
-					{
-						"command": ["bun run format", "bun run lint"],
-						"environment": {}
-					}
-				],
-				"**/*.js": [
-					{
-						"command": ["bun run format", "bun run lint"],
-						"environment": {}
-					}
-				]
-			},
-			"session_completed": [
-				{
-					"command": ["bun run lint", "bun test", "bun run build"],
-					"environment": {}
-				}
-			]
-		}
+		"biome": {}
 	}
 }
