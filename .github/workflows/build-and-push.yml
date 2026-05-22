@@ -50,11 +50,21 @@ jobs:
           fi
           # If VERSION is non-empty set the tag outputs, otherwise set empty to avoid accidental pushes
           if [ -n "$VERSION" ]; then
-            echo "tags=ghcr.io/hexbytedev/better-auth-hono:$VERSION" >> $GITHUB_OUTPUT
-            echo "migrate_tags=ghcr.io/hexbytedev/better-auth-hono-migrate:$VERSION" >> $GITHUB_OUTPUT
+            {
+              echo "tags<<EOF"
+              echo "ghcr.io/hexbytedev/better-auth-hono:$VERSION"
+              echo "ghcr.io/hexbytedev/better-auth-hono:latest"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            {
+              echo "migrate_tags<<EOF"
+              echo "ghcr.io/hexbytedev/better-auth-hono-migrate:$VERSION"
+              echo "ghcr.io/hexbytedev/better-auth-hono-migrate:latest"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
           else
-            echo "tags=" >> $GITHUB_OUTPUT
-            echo "migrate_tags=" >> $GITHUB_OUTPUT
+            echo "tags=" >> "$GITHUB_OUTPUT"
+            echo "migrate_tags=" >> "$GITHUB_OUTPUT"
           fi
 
       - name: 🔍 Show computed image tag
