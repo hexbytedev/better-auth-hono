@@ -410,25 +410,15 @@ export const auth = betterAuth({
 			sendOnSignUp: true,
 			sendOnSignIn: false, // Don't send on every sign-in attempt
 			autoSignInAfterVerification: false,
-			async sendVerificationEmail({ user, url, token }) {
+			async sendVerificationEmail({ user, url }) {
 				try {
-					console.log(`[${new Date().toISOString()}] Sending verification email to ${user.email}`);
-					console.log("Original backend URL:", url);
-
-					// Extract token and create a frontend URL
-					const frontendVerificationUrl = `${CLIENT_URL}/verify-email?token=${token}`;
-					console.log("Frontend verification URL:", frontendVerificationUrl);
-
-					// Send email with frontend URL instead of backend URL
-					await sendVerificationEmail(user, frontendVerificationUrl);
+					await sendVerificationEmail(user, url);
 				} catch (error) {
-					console.error("Failed to send verification email:", error);
 					Sentry.captureException(error, {
 						tags: { feature: "auth", operation: "send-verification-email" },
 						user: { id: user.id, email: user.email },
-						extra: { token },
 					});
-					throw error; // Re-throw so Better Auth knows it failed
+					throw error;
 				}
 			},
 			expiresIn: TOKEN_EXPIRATION_SECONDS,
