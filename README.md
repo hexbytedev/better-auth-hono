@@ -4,16 +4,16 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 
 ## Why this project
 
-- Provides a ready-to-run Docker image that’s easy to deploy and configure via `.env.local`.
+- Provides ready-to-run Docker images that are easy to deploy and configure via `.env.local`.
 - Environment-first validation, Sentry integration, sensible CORS/cookie settings, and schema/indexing tuned for Postgres.
 - Keeps Better-Auth itself unchanged - improvements live around the integration surface for safety and portability.
 
 ## What you get
 
-- Single Docker image, runnable on any container platform (see `Dockerfile` and `docker-compose.yml`).
+- Runtime and migration Docker images, runnable on any container platform (see `Dockerfile` and `docker-compose.yml`).
 - Drizzle ORM schema with UUID primary keys and indices optimized for fast lookups (see `src/db/schema.ts`).
-- JWT support for microservices (`src/auth.ts`) and an internal Basic‑Auth protected user lookup API (`/api/users/*`).
-- Sign up fraud mitigation: domain/email/IP checks against an external fraud service to reduce abuse.
+- JWT support for microservices (`src/auth.ts`) and an internal Basic-Auth protected user lookup API (`GET /api/users/id/:id`, `POST /api/users/email`).
+- Sign up fraud mitigation: email/IP checks against an external fraud service to reduce abuse.
 
 ## Features at a Glance
 
@@ -24,8 +24,8 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 | **Social OAuth** | Login via Google and GitHub providers | ✅ |
 | **Email & Password** | Traditional credentials with verification & reset | ✅ |
 | **JWT Support** | Stateless tokens for microservice authentication | ✅ |
-| **Internal User API** | **Custom** Basic-Auth protected lookup (ID/Email) | ✅ |
-| **Signup Protection** | **Custom** Fraud checks for Email, Domain, and IP | ✅ |
+| **Internal User API** | **Custom** Basic-Auth protected lookup by ID and email | ✅ |
+| **Signup Protection** | **Custom** Fraud checks for email and IP | ✅ |
 | **OpenAPI/Swagger** | Automated API documentation and reference | ✅ |
 | **Docker Support** | Optimized production-ready container images | ✅ |
 | **Database ORM** | Drizzle with UUID v7 and optimized indexing | ✅ |
@@ -51,12 +51,17 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 - `bun run build`
 - `bun run start`
 
+### Database / migrations
+
+- `bun run generate`
+- `bun run push`
+- `drizzle.config.ts` loads `.env.local`, so Drizzle commands use that file for `DATABASE_URL`.
+
 ### Code quality
 
 This project uses Husky for Git hooks to ensure code quality:
 
-- **Pre-commit hook**: Automatically runs `biome check --write` to lint and format code before each commit
-- **Commit-msg hook**: Validates commit messages (minimum 10 characters)
+- **Pre-commit hook**: Runs `bun run lint` before each commit.
 
 To manually run linting and formatting:
 
@@ -69,14 +74,15 @@ To manually run linting and formatting:
 - `src/index.ts` - app bootstrap, CORS, mounts Better-Auth and internal routes.
 - `src/auth.ts` - Better-Auth configuration, plugins, hooks, drizzle adapter, email callbacks.
 - `src/db/schema.ts` - Drizzle schema and indices.
-- `src/routes/users.route.ts` - Basic‑Auth protected internal user lookup.
+- `src/routes/users.route.ts` - Basic-Auth protected internal user lookup (`GET /api/users/id/:id`, `POST /api/users/email`).
 
 ### Security & operations
 
 - Fail-fast env validation prevents accidental misconfiguration.
 - Sentry captures structured errors with tags for faster triage.
-- Sign up hooks consult a fraud-check API to block suspicious registrations.
-- Basic Auth middleware protects internal endpoints and uses timing‑safe comparisons.
+- Sign up hooks consult a fraud-check API to screen registrations using email and IP checks.
+- Basic Auth middleware protects internal endpoints and uses timing-safe comparisons.
+- `/api/users/*` routes are mounted only when both `API_AUTH_USER` and `API_AUTH_PASSWORD` are configured.
 
 ### Development notes
 
