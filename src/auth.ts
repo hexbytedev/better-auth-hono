@@ -120,32 +120,7 @@ export const auth = betterAuth({
 							});
 						}
 
-						// Step 2: If email passes, check domain
-						const domain = email.split("@")[1];
-						if (domain) {
-							const domainResponse = await fetch(
-								`${FRAUD_CHECK_API_URL}/domain/${encodeURIComponent(domain)}`,
-								{
-									method: "GET",
-									headers: {
-										"User-Agent": "better-auth-app",
-									},
-								},
-							);
-
-							if (domainResponse.status === 200) {
-								// Domain is valid, proceed to IP check
-							} else {
-								// Domain check failed, throw error
-								console.log(`Domain fraud check failed for domain: ${domain}`);
-								throw new APIError("BAD_REQUEST", {
-									code: "DOMAIN_NOT_ALLOWED",
-									message: "The email domain is not allowed. Please use a different email address.",
-								});
-							}
-						}
-
-						// Step 3: Check IP address
+						// Step 2: Check IP address
 						// Check headers sequentially for client IP
 						const headers = ["cf-connecting-ip", "x-forwarded-for", "x-real-ip"];
 						let clientIP = "unknown";
