@@ -10,9 +10,6 @@ updates:
       interval: "daily"
     # Allow up to 20 open pull requests for dependencies
     open-pull-requests-limit: 20
-    commit-message:
-      prefix: "deps"
-      include: "scope"
 
   - package-ecosystem: "docker"
     directory: "/"
