@@ -28,8 +28,12 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { auth } from "./auth";
 import { getAllowedOrigins, getAppHost, getAppPort } from "./config/app.config";
+import { checkEnv } from "./lib/env";
 import { isBasicAuthEnabled } from "./middleware/api-key.middleware";
 import usersRoute from "./routes/users.route";
+
+// Validate all required environment variables before starting the server
+checkEnv();
 
 const allowedOrigins = getAllowedOrigins();
 
