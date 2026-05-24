@@ -26,11 +26,13 @@ export function optionalEnv(name: string): string | undefined {
 }
 
 export function checkEnv(): void {
-	if (missing.size > 0) {
-		const vars = Array.from(missing).sort();
-		console.error(
-			`[ENV] Missing ${vars.length} required environment variable${vars.length > 1 ? "s" : ""}:\n${vars.map((v) => `  - ${v}`).join("\n")}`,
-		);
-		throw new Error(`Missing required environment variables: ${vars.join(", ")}`);
-	}
+	if (missing.size === 0) return;
+
+	const vars = Array.from(missing).sort();
+	const label = vars.length === 1 ? "variable is" : "variables are";
+
+	console.error(
+		`\n  ${vars.length} required environment ${label} missing:\n${vars.map((v) => `    · ${v}`).join("\n")}\n\n  Set them in .env.local or the environment and restart.\n  See .env.sample for the full list of available variables.\n`,
+	);
+	process.exit(1);
 }
