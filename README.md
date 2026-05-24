@@ -1,6 +1,6 @@
 # Better-Auth Hono - Production-ready Auth Server
 
-This repository packages Better-Auth into a focused, deployable Docker image that delivers a complete authentication service (passkeys, TOTP, JWTs, social OAuth, email/password, and an internal lookup API) with pragmatic operational defaults applied.
+This repository packages Better-Auth into a focused, deployable Docker image that delivers a complete authentication service (passkeys, TOTP, JWTs, social OAuth, email/password, email OTP, and an internal lookup API) with pragmatic operational defaults applied.
 
 ## Why this project
 
@@ -13,6 +13,7 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 - Runtime and migration Docker images, runnable on any container platform (see `Dockerfile` and `docker-compose.yml`).
 - Drizzle ORM schema with UUID primary keys and indices optimized for fast lookups (see `src/db/schema.ts`).
 - JWT support for microservices (`src/auth.ts`) and an internal Basic-Auth protected user lookup API (`GET /api/users/id/:id`, `POST /api/users/email`).
+- Email OTP authentication: sign-in, email verification, password reset, and email change via one-time codes.
 - Sign up fraud mitigation: email/IP checks against an external fraud service to reduce abuse.
 
 ## Features at a Glance
@@ -23,6 +24,7 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 | **Two-Factor (2FA)** | Multi-factor authentication via TOTP | ✅ |
 | **Social OAuth** | Login via Google and GitHub providers | ✅ |
 | **Email & Password** | Traditional credentials with verification & reset | ✅ |
+| **Email OTP** | Sign-in, verification, and password reset via one-time codes | ✅ |
 | **JWT Support** | Stateless tokens for microservice authentication | ✅ |
 | **Internal User API** | **Custom** Basic-Auth protected lookup by ID and email | ✅ |
 | **Signup Protection** | **Custom** Fraud checks for email and IP | ✅ |
@@ -31,6 +33,17 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 | **Database ORM** | Drizzle with UUID v7 and optimized indexing | ✅ |
 | **Sentry Monitoring** | Structured error tracking and performance metrics | ✅ |
 | **Code Quality** | Biome linting/formatting and Husky git hooks | ✅ |
+
+## Better Auth Plugins in Use
+
+| Plugin | Import | Configurable |
+| :--- | :--- | :---: |
+| **Expo** | `@better-auth/expo` | Always |
+| **Email OTP** | `better-auth/plugins` | `EMAIL_OTP_ENABLED` |
+| **OpenAPI** | `better-auth/plugins` | Always |
+| **Passkey** | `@better-auth/passkey` | Always |
+| **Two-Factor (2FA)** | `better-auth/plugins` | Always |
+| **JWT** | `better-auth/plugins` | Always |
 
 ## Deployment to the production cloud
 
@@ -73,6 +86,7 @@ To manually run linting and formatting:
 
 - `src/index.ts` - app bootstrap, CORS, mounts Better-Auth and internal routes.
 - `src/auth.ts` - Better-Auth configuration, plugins, hooks, drizzle adapter, email callbacks.
+- `src/lib/email.ts` - Email delivery via Resend (verification, password reset, OTP, email change).
 - `src/db/schema.ts` - Drizzle schema and indices.
 - `src/routes/users.route.ts` - Basic-Auth protected internal user lookup (`GET /api/users/id/:id`, `POST /api/users/email`).
 
@@ -81,6 +95,7 @@ To manually run linting and formatting:
 - Fail-fast env validation prevents accidental misconfiguration.
 - Sentry captures structured errors with tags for faster triage.
 - Sign up hooks consult a fraud-check API to screen registrations using email and IP checks.
+- Email OTP is opt-in (`EMAIL_OTP_ENABLED=true`) with configurable expiry and hashed OTP storage.
 - Basic Auth middleware protects internal endpoints and uses timing-safe comparisons.
 - `/api/users/*` routes are mounted only when both `API_AUTH_USER` and `API_AUTH_PASSWORD` are configured.
 
