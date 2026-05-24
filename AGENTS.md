@@ -22,6 +22,26 @@
 - Use `.env.sample` as the authoritative env template; use `README.md` for deployment and workflow notes.
 - `drizzle.config.ts` explicitly loads `.env.local`, so Drizzle commands require explicit permission before reading that ignored file.
 
+### Adding a New Environment Variable
+
+When adding a new env var, make changes in three places:
+
+1. **`src/lib/env.ts`** — Use one of three helpers:
+   - `requireEnv("NAME")` — app won't start without it (security-critical, DB credentials, API keys). Multiple missing vars are collected and reported together.
+   - `envWithDefault("NAME", "default")` — has a safe fallback for local dev (e.g. `JWT_EXPIRATION_TIME`, `PRIMARY_COLOR`). Logs a notice when default is used.
+   - `optionalEnv("NAME")` — truly optional, returns `undefined` if not set (e.g. feature flags, optional API URLs).
+
+2. **`.env.sample`** — Add the variable with a comment block explaining its purpose, format, and default value. Use the same section header style as existing entries.
+
+3. **Usage site** — Read it at module scope in the file that needs it (e.g. `src/auth.ts`, `src/lib/email.ts`, `src/db/index.ts`).
+
+**How to judge required vs optional:**
+- `requireEnv` if the app cannot function without it (auth secrets, database URL, email credentials).
+- `envWithDefault` if local dev can work with a reasonable fallback but production should set it explicitly (branding colors, token expiry, dev-only URLs).
+- `optionalEnv` if it genuinely enables/disables a non-critical feature (fraud check URL, Sentry DSN).
+
+**Important:** Keep all `requireEnv` / `envWithDefault` / `optionalEnv` calls at module scope, not inside request handlers. This ensures `checkEnv()` in `src/index.ts` catches missing vars before the server starts.
+
 ## Commands (Bun)
 
 Install
