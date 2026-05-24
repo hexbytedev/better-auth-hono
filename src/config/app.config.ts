@@ -3,8 +3,9 @@
 // Default application settings
 const DEFAULT_APP_PORT = 8558;
 
-const CLIENT_URL = process.env.CLIENT_URL?.trim();
-if (!CLIENT_URL) throw new Error("CLIENT_URL is missing");
+import { requireEnv } from "../lib/env";
+
+const CLIENT_URL = requireEnv("CLIENT_URL");
 
 /**
  * Safely trim a string value, handling undefined/null

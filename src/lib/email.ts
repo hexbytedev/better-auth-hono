@@ -2,37 +2,30 @@
 
 import * as Sentry from "@sentry/bun";
 import { Resend } from "resend";
+import { envWithDefault, requireEnv } from "./env";
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim();
-if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY is missing");
+const RESEND_API_KEY = requireEnv("RESEND_API_KEY");
+const EMAIL_FROM = requireEnv("EMAIL_FROM");
+const COMPANY_NAME = requireEnv("COMPANY_NAME");
+const PRIMARY_COLOR_RAW = envWithDefault("PRIMARY_COLOR", "2d5a2d");
 
-const EMAIL_FROM = process.env.EMAIL_FROM?.trim();
-if (!EMAIL_FROM) throw new Error("EMAIL_FROM is missing");
+const TOKEN_EXPIRATION_SECONDS = Number.parseInt(
+	envWithDefault("TOKEN_EXPIRATION_SECONDS", "3600"),
+	10,
+);
 
-const COMPANY_NAME_RAW = process.env.COMPANY_NAME?.trim();
-if (!COMPANY_NAME_RAW) throw new Error("COMPANY_NAME is missing");
-const COMPANY_NAME: string = COMPANY_NAME_RAW;
-
-const PRIMARY_COLOR_RAW = process.env.PRIMARY_COLOR?.trim();
-if (!PRIMARY_COLOR_RAW) throw new Error("PRIMARY_COLOR is missing");
+const OTP_EXPIRATION_SECONDS = Number.parseInt(envWithDefault("OTP_EXPIRATION_SECONDS", "300"), 10);
 
 // Add # prefix if not present
 const PRIMARY_COLOR = PRIMARY_COLOR_RAW.startsWith("#")
 	? PRIMARY_COLOR_RAW
 	: `#${PRIMARY_COLOR_RAW}`;
 
-// Token expiration in seconds (used for both email verification and password reset)
-const TOKEN_EXPIRATION_SECONDS = Number.parseInt(
-	process.env.TOKEN_EXPIRATION_SECONDS?.trim() || "3600",
-	10,
-);
-
-const OTP_EXPIRATION_SECONDS = Number.parseInt(
-	process.env.OTP_EXPIRATION_SECONDS?.trim() || "300",
-	10,
-);
-
-const resend = new Resend(RESEND_API_KEY);
+// Deferred to avoid crash during module init when env vars are missing.
+// By the time sendEmail runs, checkEnv() has already validated all requireEnv() calls.
+function getResend(): Resend {
+	return new Resend(RESEND_API_KEY);
+}
 
 // Helper to convert seconds to human-readable format
 function formatExpirationTime(seconds: number): string {
@@ -70,7 +63,7 @@ interface User {
 }
 
 async function sendEmail(emailType: string, to: string, subject: string, html: string) {
-	const { data, error } = await resend.emails.send({
+	const { data, error } = await getResend().emails.send({
 		from: `${COMPANY_NAME} <${EMAIL_FROM}>`,
 		to: [to],
 		subject,

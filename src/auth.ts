@@ -17,6 +17,7 @@ import {
 	sendPasswordResetEmail,
 	sendVerificationEmail,
 } from "./lib/email";
+import { envWithDefault, requireEnv } from "./lib/env";
 import { maskEmail } from "./lib/redaction";
 
 const OUTBOUND_REQUEST_TIMEOUT_MS = 5000;
@@ -38,30 +39,19 @@ function getRequestSignal(): AbortSignal {
 
 const allowedOrigins = getAllowedOrigins();
 
-const SERVER_URL = process.env.BETTER_AUTH_SERVER_URL?.trim();
-if (!SERVER_URL) throw new Error("BETTER_AUTH_SERVER_URL is missing");
-
-const BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET?.trim();
-if (!BETTER_AUTH_SECRET) throw new Error("BETTER_AUTH_SECRET is missing");
-
-const BETTER_AUTH_RP_ID = process.env.BETTER_AUTH_RP_ID?.trim();
-if (!BETTER_AUTH_RP_ID) throw new Error("BETTER_AUTH_RP_ID is missing");
-
-const BETTER_AUTH_RP_NAME = process.env.BETTER_AUTH_RP_NAME?.trim();
-if (!BETTER_AUTH_RP_NAME) throw new Error("BETTER_AUTH_RP_NAME is missing");
-
-const CLIENT_URL = process.env.CLIENT_URL?.trim();
-if (!CLIENT_URL) throw new Error("CLIENT_URL is missing");
-
-const JWT_EXPIRATION_TIME = process.env.JWT_EXPIRATION_TIME?.trim();
-if (!JWT_EXPIRATION_TIME) throw new Error("JWT_EXPIRATION_TIME is missing");
+const SERVER_URL = requireEnv("BETTER_AUTH_SERVER_URL");
+const BETTER_AUTH_SECRET = requireEnv("BETTER_AUTH_SECRET");
+const BETTER_AUTH_RP_ID = requireEnv("BETTER_AUTH_RP_ID");
+const BETTER_AUTH_RP_NAME = requireEnv("BETTER_AUTH_RP_NAME");
+const CLIENT_URL = requireEnv("CLIENT_URL");
+const JWT_EXPIRATION_TIME = envWithDefault("JWT_EXPIRATION_TIME", "1h");
 
 // Optional: Fraud check API URL
 const FRAUD_CHECK_API_URL = process.env.FRAUD_CHECK_API_URL?.trim();
 
 // Token expiration in seconds (used for both email verification and password reset)
 const TOKEN_EXPIRATION_SECONDS = Number.parseInt(
-	process.env.TOKEN_EXPIRATION_SECONDS?.trim() || "3600",
+	envWithDefault("TOKEN_EXPIRATION_SECONDS", "3600"),
 	10,
 );
 
