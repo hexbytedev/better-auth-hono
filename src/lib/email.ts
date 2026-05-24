@@ -9,8 +9,9 @@ if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY is missing");
 const EMAIL_FROM = process.env.EMAIL_FROM?.trim();
 if (!EMAIL_FROM) throw new Error("EMAIL_FROM is missing");
 
-const COMPANY_NAME = process.env.COMPANY_NAME?.trim();
-if (!COMPANY_NAME) throw new Error("COMPANY_NAME is missing");
+const COMPANY_NAME_RAW = process.env.COMPANY_NAME?.trim();
+if (!COMPANY_NAME_RAW) throw new Error("COMPANY_NAME is missing");
+const COMPANY_NAME: string = COMPANY_NAME_RAW;
 
 const PRIMARY_COLOR_RAW = process.env.PRIMARY_COLOR?.trim();
 if (!PRIMARY_COLOR_RAW) throw new Error("PRIMARY_COLOR is missing");
@@ -23,6 +24,11 @@ const PRIMARY_COLOR = PRIMARY_COLOR_RAW.startsWith("#")
 // Token expiration in seconds (used for both email verification and password reset)
 const TOKEN_EXPIRATION_SECONDS = Number.parseInt(
 	process.env.TOKEN_EXPIRATION_SECONDS?.trim() || "3600",
+	10,
+);
+
+const OTP_EXPIRATION_SECONDS = Number.parseInt(
+	process.env.OTP_EXPIRATION_SECONDS?.trim() || "300",
 	10,
 );
 
@@ -229,6 +235,53 @@ export async function sendPasswordResetEmail(user: User, resetUrl: string) {
 
 	const html = getEmailTemplate(subject, bodyContent, footerContent);
 	return sendEmail("password-reset", user.email, subject, html);
+}
+
+/**
+ * Sends an OTP code to the user's email
+ * @param email - The recipient email address
+ * @param otp - The one-time password to send
+ * @param type - The type of OTP (sign-in, email-verification, forget-password)
+ * @returns Promise with the email service response
+ */
+export async function sendOtpEmail(
+	email: string,
+	otp: string,
+	type: "sign-in" | "email-verification" | "forget-password" | "change-email",
+) {
+	const subjectByType = {
+		"sign-in": "Your sign-in code",
+		"email-verification": "Verify your email address",
+		"forget-password": "Reset your password",
+		"change-email": "Confirm your new email",
+	};
+
+	const bodyByType = {
+		"sign-in": `<p>Use the following code to sign in to your <strong>${escapeHtml(COMPANY_NAME)}</strong> account.</p>`,
+		"email-verification": `<p>Use the following code to verify your email address for <strong>${escapeHtml(COMPANY_NAME)}</strong>.</p>`,
+		"forget-password": `<p>Use the following code to reset your password for <strong>${escapeHtml(COMPANY_NAME)}</strong>.</p>`,
+		"change-email": `<p>Use the following code to confirm your new email address for <strong>${escapeHtml(COMPANY_NAME)}</strong>.</p>`,
+	};
+
+	const subject = subjectByType[type];
+	const bodyContent = `
+		${bodyByType[type]}
+		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 20px; margin-bottom: 20px;">
+			<tr>
+				<td align="center">
+					<div style="display: inline-block; background-color: #f4f4f5; border: 2px dashed #d4d4d8; border-radius: 12px; padding: 24px 48px; letter-spacing: 8px; font-size: 36px; font-weight: 700; color: #18181b; font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;">${escapeHtml(otp)}</div>
+				</td>
+			</tr>
+		</table>
+		<p style="font-size: 14px; color: #71717a;">This code will expire in ${formatExpirationTime(OTP_EXPIRATION_SECONDS)}. If you didn't request this, you can safely ignore this email.</p>
+	`;
+
+	const footerContent = `
+		If you didn't request this code, someone else might be trying to access your account. Please ignore this email.
+	`;
+
+	const html = getEmailTemplate(subject, bodyContent, footerContent);
+	return sendEmail(`otp-${type}`, email, subject, html);
 }
 
 /**

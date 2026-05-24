@@ -6,13 +6,14 @@ import { passkey } from "@better-auth/passkey";
 import * as Sentry from "@sentry/bun";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
-import { jwt, openAPI, twoFactor } from "better-auth/plugins";
+import { emailOTP, jwt, openAPI, twoFactor } from "better-auth/plugins";
 import { and, eq, ilike, inArray, not, or } from "drizzle-orm";
 import { getAllowedOrigins } from "./config/app.config";
 import { db } from "./db";
 import * as schema from "./db/schema";
 import {
 	sendChangeEmailConfirmationEmail,
+	sendOtpEmail,
 	sendPasswordResetEmail,
 	sendVerificationEmail,
 } from "./lib/email";
@@ -83,6 +84,15 @@ const isGithubEnabled = Boolean(GITHUB_CLIENT_ID && GITHUB_CLIENT_SECRET);
 
 // Check if email/password authentication should be enabled (Defaults to true unless explicitly "false")
 const EMAIL_PASSWORD_ENABLED = process.env.EMAIL_PASSWORD_ENABLED?.trim() !== "false";
+
+// Email OTP feature flag (Defaults to false unless explicitly "true")
+const EMAIL_OTP_ENABLED = process.env.EMAIL_OTP_ENABLED?.trim() === "true";
+
+// OTP expiration in seconds (optional, default: 300)
+const OTP_EXPIRATION_SECONDS = Number.parseInt(
+	process.env.OTP_EXPIRATION_SECONDS?.trim() || "300",
+	10,
+);
 
 export const auth = betterAuth({
 	baseURL: SERVER_URL,
@@ -183,7 +193,9 @@ export const auth = betterAuth({
 								);
 
 								if (ipResponse.status === 200) {
-									const ipData = await ipResponse.json();
+									const ipData = (await ipResponse.json()) as {
+										security?: { is_threat?: boolean };
+									};
 									const security = ipData?.security;
 
 									if (security && security.is_threat === true) {
@@ -293,12 +305,12 @@ export const auth = betterAuth({
 					return;
 				}
 
-				const emails: Array<{
+				const emails = (await res.json()) as Array<{
 					email: string;
 					primary?: boolean;
 					verified?: boolean;
 					visibility?: string | null;
-				}> = await res.json();
+				}>;
 
 				// Process and store verified emails
 				const filteredInput = emails
@@ -449,6 +461,22 @@ export const auth = betterAuth({
 
 	plugins: [
 		expo(),
+		...(EMAIL_OTP_ENABLED
+			? [
+					emailOTP({
+						storeOTP: "hashed",
+						expiresIn: OTP_EXPIRATION_SECONDS,
+						async sendVerificationOTP({ email, otp, type }) {
+							sendOtpEmail(email, otp, type).catch((error) => {
+								Sentry.captureException(error, {
+									tags: { feature: "auth", operation: "send-otp-email" },
+									extra: { email, type },
+								});
+							});
+						},
+					}),
+				]
+			: []),
 		openAPI(),
 		passkey({
 			schema: {
