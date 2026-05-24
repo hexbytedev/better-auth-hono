@@ -73,7 +73,8 @@ CI
 
 - `tsconfig.json` has `strict: true`.
 - Keep types explicit where inference is unclear.
-- Avoid `any` when practical, but lint allows it (use sparingly).
+- Never use `any` or `unknown`. Always provide explicit types for runtime values from external sources (e.g. `res.json()`, `fetch()` responses). Use type assertions (`as Type`) or typed wrappers instead.
+- Prefer `Record<string, unknown>` over `{}` and use proper type guards when dealing with dynamic data.
 
 ### Imports
 
