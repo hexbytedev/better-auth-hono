@@ -14,7 +14,7 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 - Drizzle ORM schema with UUID primary keys and indices optimized for fast lookups (see `src/db/schema.ts`).
 - JWT support for microservices (`src/auth.ts`) and an internal Basic-Auth protected user lookup API (`GET /api/users/id/:id`, `POST /api/users/email`).
 - Email OTP authentication: sign-in, email verification, password reset, and email change via one-time codes.
-- Sign up fraud protection: during registration, emails and IP addresses are checked against the [Deghost fraud detection API](https://deghost.hexbyte.dev) to block disposable emails, known abusive domains, and suspicious IPs.
+- Sign up fraud protection: during registration, emails and IP addresses are checked against the [Deghost fraud detection API](https://deghost.hexbyte.dev) (API endpoint: https://deghostapi.hexbyte.dev) to block disposable emails, known abusive domains, and suspicious IPs.
 
 ## Features at a Glance
 
@@ -94,7 +94,7 @@ To manually run linting and formatting:
 
 - Fail-fast env validation prevents accidental misconfiguration.
 - Sentry captures structured errors with tags for faster triage.
-- Sign up hooks consult the [Deghost fraud detection API](https://deghost.hexbyte.dev) to screen registrations — emails are checked against known disposable / abusive domains, and IPs are checked for proxy/VPN and threat signals.
+- Sign up hooks consult the [Deghost fraud detection API](https://deghost.hexbyte.dev) (API endpoint: https://deghostapi.hexbyte.dev) to screen registrations — emails are checked against known disposable / abusive domains, and IPs are checked for proxy/VPN and threat signals.
 - Email OTP is opt-in (`EMAIL_OTP_ENABLED=true`) with configurable expiry and hashed OTP storage.
 - Basic Auth middleware protects internal endpoints and uses timing-safe comparisons.
 - `/api/users/*` routes are mounted only when both `API_AUTH_USER` and `API_AUTH_PASSWORD` are configured.
