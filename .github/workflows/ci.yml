@@ -1,5 +1,5 @@
-name: Linting
-run-name: ${{ github.actor }} is Linting on ${{ github.ref }}
+name: CI
+run-name: ${{ github.actor }} is running CI on ${{ github.ref }}
 
 on:
   push:
@@ -27,7 +27,7 @@ permissions:
   contents: read
 
 jobs:
-  linting:
+  quality:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -51,7 +51,13 @@ jobs:
         run: bun install
 
       - name: 🔍 Lint
-        run: bun run lint
+        run: bun run lint:check
+
+      - name: 🏗️ Build
+        run: bun run build
+
+      - name: 🧪 Test
+        run: bun run test
 
       - name: 🛡️ Audit dependencies
         run: bun audit --audit-level=high

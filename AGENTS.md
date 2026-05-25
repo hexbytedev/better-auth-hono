@@ -70,13 +70,13 @@ DB (Drizzle)
 
 Tests
 
-- No `test` script is configured in `package.json`.
-- If adding tests, prefer Bun test (`bun test`) and update this file with
-  single-test examples (e.g., `bun test path/to/file.test.ts`).
+- `bun run test`
+- Single file: `bun test src/index.smoke.test.ts`
+- Single test name: `bun test -t "application smoke tests"`
 
 CI
 
-- GitHub Actions runs a lint workflow with `bun run lint` and `bun audit --audit-level=high`.
+- GitHub Actions runs PR CI with `bun run lint:check`, `bun run build`, `bun run test`, and `bun audit --audit-level=high`.
 - A separate workflow builds and pushes Docker images on tag pushes or manual `workflow_dispatch`.
 
 ## Code Style Guidelines

@@ -64,6 +64,11 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 - `bun run build`
 - `bun run start`
 
+### Tests
+
+- `bun run test`
+- `bun test src/index.smoke.test.ts`
+
 ### Database / migrations
 
 - `bun run generate`
@@ -81,6 +86,13 @@ To manually run linting and formatting:
 - `bun run lint` - Lint and auto-fix issues
 - `bun run lint:check` - Check for issues without fixing
 - `bun run format` - Format code
+
+GitHub pull requests also run:
+
+- `bun run lint:check`
+- `bun run build`
+- `bun run test`
+- `bun audit --audit-level=high`
 
 ### Key files
 
