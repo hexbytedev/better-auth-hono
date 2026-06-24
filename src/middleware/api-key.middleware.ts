@@ -1,5 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
 import type { Context, Next } from "hono";
+import { getConnInfo } from "hono/bun";
+
+// ── Environment Variables ──────────────────────────────────────────
 
 // Get credentials from env and trim whitespace safely
 const AUTH_USER = process.env.API_AUTH_USER?.trim();
@@ -13,32 +16,27 @@ const ALLOWED_IPS = ALLOWED_IPS_RAW
 			.filter((ip) => ip.length > 0)
 	: [];
 
+// Load trusted proxies (e.g., nginx IPs/CIDRs)
+const TRUSTED_PROXIES_RAW = process.env.TRUSTED_PROXIES?.trim() || "";
+const TRUSTED_PROXIES = TRUSTED_PROXIES_RAW
+	? TRUSTED_PROXIES_RAW.split(",")
+			.map((p) => p.trim())
+			.filter((p) => p.length > 0)
+	: [];
+
 // Check if Basic Auth is enabled
 export const isBasicAuthEnabled = !!(AUTH_USER && AUTH_PASS);
 
 // Check if IP whitelist is enabled (requires Basic Auth to be enabled)
 export const isIPWhitelistEnabled = isBasicAuthEnabled && ALLOWED_IPS.length > 0;
 
+// ── IP & CIDR Utilities ────────────────────────────────────────────
+
 /**
- * Get client IP address from request
- * Checks X-Forwarded-For header first (for proxied requests), then falls back to direct connection
+ * Convert IPv4 address to number
  */
-function getClientIP(c: Context): string {
-	// Check X-Forwarded-For header (common for load balancers/proxies)
-	const forwardedFor = c.req.header("x-forwarded-for");
-	if (forwardedFor) {
-		// Take the first IP (original client)
-		return forwardedFor.split(",")[0].trim();
-	}
-
-	// Fall back to CF-Connecting-IP (Cloudflare)
-	const cfIP = c.req.header("cf-connecting-ip");
-	if (cfIP) {
-		return cfIP.trim();
-	}
-
-	// Fall back to direct connection
-	return c.req.header("x-real-ip") || "unknown";
+function ipToNumber(ip: string): number {
+	return ip.split(".").reduce((acc, octet) => (acc << 8) + Number.parseInt(octet, 10), 0) >>> 0;
 }
 
 /**
@@ -56,11 +54,85 @@ function isIPInCIDR(ip: string, cidr: string): boolean {
 }
 
 /**
- * Convert IPv4 address to number
+ * Check if an IP is in the trusted proxy list.
+ * Supports both exact IPs and CIDR ranges (IPv4).
  */
-function ipToNumber(ip: string): number {
-	return ip.split(".").reduce((acc, octet) => (acc << 8) + Number.parseInt(octet, 10), 0) >>> 0;
+function isTrustedProxy(ip: string): boolean {
+	if (TRUSTED_PROXIES.length === 0) return false;
+
+	// Normalize IPv6-mapped IPv4 (e.g., ::ffff:127.0.0.1 -> 127.0.0.1)
+	const normalized = ip.replace(/^::ffff:/, "");
+
+	return TRUSTED_PROXIES.some((entry) => {
+		if (entry.includes("/")) {
+			return isIPInCIDR(normalized, entry);
+		}
+		return entry === normalized;
+	});
 }
+
+/**
+ * Get the real client IP address.
+ *
+ * SECURITY MODEL:
+ * 1. Use getConnInfo() to get the TCP-level remote address — this
+ *    CANNOT be spoofed via HTTP headers.
+ * 2. If the TCP connection comes from a trusted proxy (nginx),
+ *    read X-Real-IP (set by nginx to $remote_addr) — the authoritative
+ *    single-IP header that nginx overwrites.
+ * 3. If the TCP connection is NOT from a trusted proxy (direct access,
+ *    bypassing nginx), use the raw TCP remote address instead.
+ * 4. CF-Connecting-IP is NEVER checked — Cloudflare is not in front,
+ *    so any value in that header is attacker-supplied.
+ */
+export function getClientIP(c: Context): string {
+	// 1. Get the actual TCP-level connection source (unspoofable)
+	let socketIP = "unknown";
+	try {
+		const connInfo = getConnInfo(c);
+		socketIP = connInfo.remote.address || "unknown";
+	} catch {
+		// getConnInfo may fail in some edge cases (e.g., unix sockets)
+		socketIP = "unknown";
+	}
+
+	// 2. If the direct TCP connection is from a trusted proxy,
+	//    trust the X-Real-IP header that nginx set from $remote_addr.
+	if (socketIP !== "unknown" && isTrustedProxy(socketIP)) {
+		const realIP = c.req.header("x-real-ip");
+		if (realIP) {
+			return realIP.trim();
+		}
+
+		// Fallback: X-Forwarded-For — only safe here because nginx
+		// overwrites it with $remote_addr (not $proxy_add_x_forwarded_for).
+		const forwardedFor = c.req.header("x-forwarded-for");
+		if (forwardedFor) {
+			return forwardedFor.split(",")[0].trim();
+		}
+	}
+
+	// 3. Not a trusted proxy (direct connection bypassing nginx).
+	//    Use the raw TCP address — this is the best we can do.
+	//    Do NOT read any forwarded headers in this path.
+	if (socketIP !== "unknown") {
+		return socketIP.replace(/^::ffff:/, "");
+	}
+
+	// 4. Last resort: X-Real-IP only if we couldn't get socket info.
+	//    This is a degraded state — log a warning.
+	const realIP = c.req.header("x-real-ip");
+	if (realIP) {
+		console.warn(
+			"[Security] Could not determine TCP source; falling back to X-Real-IP without proxy validation.",
+		);
+		return realIP.trim();
+	}
+
+	return "unknown";
+}
+
+// ── Auth Validation ────────────────────────────────────────────────
 
 function safeCompare(a: string, b: string): boolean {
 	const bufA = Buffer.from(a);
