@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.23",
-    "@better-auth/expo": "^1.6.20",
+    "@better-auth/expo": "^1.6.23",
     "@better-auth/passkey": "^1.6.20",
     "@hono/zod-validator": "^0.8.0",
     "@sentry/bun": "^10.63.0",
