@@ -72,6 +72,22 @@ function isTrustedProxy(ip: string): boolean {
 }
 
 /**
+ * Check whether a client IP satisfies the configured whitelist.
+ * Supports exact IP matches and CIDR ranges (IPv4).
+ */
+function isIPAllowed(clientIP: string): boolean {
+	return ALLOWED_IPS.some((allowedIP) => {
+		// Exact match
+		if (allowedIP === clientIP) return true;
+		// CIDR notation support (e.g., 192.168.1.0/24)
+		if (allowedIP.includes("/")) {
+			return isIPInCIDR(clientIP, allowedIP);
+		}
+		return false;
+	});
+}
+
+/**
  * Get the real client IP address.
  *
  * SECURITY MODEL:
@@ -156,7 +172,23 @@ export const validateBasicAuth = async (c: Context, next: Next) => {
 		return;
 	}
 
-	// 1. Extract Authorization Header
+	// 1. Enforce the IP whitelist BEFORE touching credentials
+	if (isIPWhitelistEnabled) {
+		const clientIP = getClientIP(c);
+		if (!isIPAllowed(clientIP)) {
+			console.warn(`[Security] IP not in whitelist: ${clientIP} not in ${ALLOWED_IPS.join(", ")}`);
+			return c.json(
+				{
+					success: false,
+					error: "Forbidden",
+					message: "Your IP address is not allowed to access this resource.",
+				},
+				403,
+			);
+		}
+	}
+
+	// 2. Extract Authorization Header
 	const authHeader = c.req.header("Authorization");
 
 	if (!authHeader) {
@@ -172,7 +204,7 @@ export const validateBasicAuth = async (c: Context, next: Next) => {
 		);
 	}
 
-	// 2. Decode Header (Format: "Basic <base64>")
+	// 3. Decode Header (Format: "Basic <base64>")
 	const [scheme, token] = authHeader.split(" ");
 
 	if (!scheme || !token || scheme.toLowerCase() !== "basic") {
@@ -187,7 +219,7 @@ export const validateBasicAuth = async (c: Context, next: Next) => {
 		);
 	}
 
-	// 3. Decode Base64 and Validate credentials
+	// 4. Decode Base64 and Validate credentials
 	try {
 		// Decode Base64 string "username:password"
 		const credentials = Buffer.from(token, "base64").toString("utf-8");
@@ -219,34 +251,6 @@ export const validateBasicAuth = async (c: Context, next: Next) => {
 				},
 				401,
 			);
-		}
-
-		// 4. If IP whitelist is enabled, check client IP
-		if (isIPWhitelistEnabled) {
-			const clientIP = getClientIP(c);
-			const isAllowed = ALLOWED_IPS.some((allowedIP) => {
-				// Exact match
-				if (allowedIP === clientIP) return true;
-				// CIDR notation support (e.g., 192.168.1.0/24)
-				if (allowedIP.includes("/")) {
-					return isIPInCIDR(clientIP, allowedIP);
-				}
-				return false;
-			});
-
-			if (!isAllowed) {
-				console.warn(
-					`[Security] IP not in whitelist: ${clientIP} not in ${ALLOWED_IPS.join(", ")}`,
-				);
-				return c.json(
-					{
-						success: false,
-						error: "Forbidden",
-						message: "Your IP address is not allowed to access this resource.",
-					},
-					403,
-				);
-			}
 		}
 
 		// 5. Success

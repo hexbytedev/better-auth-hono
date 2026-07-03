@@ -15,6 +15,9 @@ const emailBodySchema = z.object({
 });
 
 const userIdSchema = z.object({
+	// `version: "v7"` is intentional: all user IDs are generated as UUIDv7
+	// (see db/schema.ts `$defaultFn(() => uuidv7())`). Rejecting other UUID
+	// versions is a deliberate contract.
 	id: z.uuid({ message: "Invalid user ID format", version: "v7" }),
 });
 
