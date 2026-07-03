@@ -11,8 +11,9 @@
 - Internal API: `src/routes/users.route.ts` + `src/services/user.service.ts`.
 - Email integration: `src/lib/email.ts`.
 
-## Agent Rules (Cursor/Copilot)
+## Agent Rules & Guidance
 
+- Claude Code guidance is in `CLAUDE.md` (commands + architecture); reusable workflow skills live in `.claude/skills/` (`add-env-var`, `db-migration`, `add-auth-provider`).
 - No Cursor rules found in `.cursor/rules/` or `.cursorrules`.
 - No Copilot instructions found in `.github/copilot-instructions.md`.
 
@@ -36,6 +37,7 @@ When adding a new env var, make changes in three places:
 3. **Usage site** — Read it at module scope in the file that needs it (e.g. `src/auth.ts`, `src/lib/email.ts`, `src/db/index.ts`).
 
 **How to judge required vs optional:**
+
 - `requireEnv` if the app cannot function without it (auth secrets, database URL, email credentials).
 - `envWithDefault` if local dev can work with a reasonable fallback but production should set it explicitly (branding colors, token expiry, dev-only URLs).
 - `optionalEnv` if it genuinely enables/disables a non-critical feature (fraud check URL, Sentry DSN).
@@ -67,6 +69,7 @@ DB (Drizzle)
 
 - `bun run generate` (wrapper for `bunx drizzle-kit generate`)
 - `bun run push` (wrapper for `bunx drizzle-kit push`)
+- `bun run studio` (wrapper for `bunx drizzle-kit studio`, opens Drizzle Studio)
 
 Tests
 
@@ -76,7 +79,7 @@ Tests
 
 CI
 
-- GitHub Actions runs PR CI with `bun run lint:check`, `bun run build`, `bun run test`, and `bun audit --audit-level=high`.
+- GitHub Actions runs CI (on push and pull requests) with `bun run lint:check`, `bun run build`, `bun run test`, and `bun audit --audit-level=high`.
 - A separate workflow builds and pushes Docker images on tag pushes or manual `workflow_dispatch`.
 
 ## Code Style Guidelines
