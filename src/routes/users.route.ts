@@ -147,7 +147,7 @@ usersRoute.post("/email", validateBasicAuth, zValidator("json", emailBodySchema)
  */
 usersRoute.get("/id/:id", validateBasicAuth, zValidator("param", userIdSchema), async (c) => {
 	try {
-		const { id } = c.req.param();
+		const { id } = c.req.valid("param");
 
 		// Get user data using service function
 		const user = await getUserById(id);
