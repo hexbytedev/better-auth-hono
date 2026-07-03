@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import type { Context, Next } from "hono";
 import { getConnInfo } from "hono/bun";
+import * as ipaddr from "ipaddr.js";
 
 // ── Environment Variables ──────────────────────────────────────────
 
@@ -32,60 +33,91 @@ export const isIPWhitelistEnabled = isBasicAuthEnabled && ALLOWED_IPS.length > 0
 
 // ── IP & CIDR Utilities ────────────────────────────────────────────
 
+type IPAddress = ipaddr.IPv4 | ipaddr.IPv6;
+
 /**
- * Convert IPv4 address to number
+ * Parse an IP string into an ipaddr.js address, normalizing IPv4-mapped IPv6
+ * (e.g. ::ffff:127.0.0.1) down to its IPv4 form so it compares equal to a bare
+ * IPv4 entry. Returns null on any invalid input.
  */
-function ipToNumber(ip: string): number {
-	return ip.split(".").reduce((acc, octet) => (acc << 8) + Number.parseInt(octet, 10), 0) >>> 0;
+function parseIP(value: string): IPAddress | null {
+	const trimmed = value.trim();
+	if (!ipaddr.isValid(trimmed)) return null;
+
+	const addr = ipaddr.parse(trimmed);
+	if (addr instanceof ipaddr.IPv6 && addr.isIPv4MappedAddress()) {
+		return addr.toIPv4Address();
+	}
+	return addr;
 }
 
 /**
- * Check if an IP address is within a CIDR range
- * Supports IPv4 only (e.g., 192.168.1.0/24)
+ * True if `clientIP` matches a whitelist/proxy `entry`, which may be a bare IP
+ * (exact match) or a CIDR range. IPv4 and IPv6 never cross-match, and any
+ * malformed input returns false.
  */
-function isIPInCIDR(ip: string, cidr: string): boolean {
-	const [range, bits] = cidr.split("/");
-	const mask = ~(2 ** (32 - Number(bits)) - 1);
+function ipMatchesEntry(clientIP: string, entry: string): boolean {
+	const addr = parseIP(clientIP);
+	if (!addr) return false;
 
-	const ipNum = ipToNumber(ip);
-	const rangeNum = ipToNumber(range);
+	try {
+		if (entry.includes("/")) {
+			const [rangeAddr, bits] = ipaddr.parseCIDR(entry.trim());
+			if (addr.kind() !== rangeAddr.kind()) return false;
+			return addr.match(rangeAddr, bits);
+		}
 
-	return (ipNum & mask) === (rangeNum & mask);
+		const entryAddr = parseIP(entry);
+		if (!entryAddr) return false;
+		if (addr.kind() !== entryAddr.kind()) return false;
+		return addr.toNormalizedString() === entryAddr.toNormalizedString();
+	} catch {
+		// Malformed CIDR / kind mismatch inside ipaddr.js — fail closed.
+		return false;
+	}
 }
 
 /**
- * Check if an IP is in the trusted proxy list.
- * Supports both exact IPs and CIDR ranges (IPv4).
+ * Check if an IP is in the trusted proxy list (exact IP or CIDR range).
  */
 function isTrustedProxy(ip: string): boolean {
 	if (TRUSTED_PROXIES.length === 0) return false;
-
-	// Normalize IPv6-mapped IPv4 (e.g., ::ffff:127.0.0.1 -> 127.0.0.1)
-	const normalized = ip.replace(/^::ffff:/, "");
-
-	return TRUSTED_PROXIES.some((entry) => {
-		if (entry.includes("/")) {
-			return isIPInCIDR(normalized, entry);
-		}
-		return entry === normalized;
-	});
+	return TRUSTED_PROXIES.some((entry) => ipMatchesEntry(ip, entry));
 }
 
 /**
- * Check whether a client IP satisfies the configured whitelist.
- * Supports exact IP matches and CIDR ranges (IPv4).
+ * Check whether a client IP satisfies the configured whitelist
+ * (exact IP or CIDR range).
  */
 function isIPAllowed(clientIP: string): boolean {
-	return ALLOWED_IPS.some((allowedIP) => {
-		// Exact match
-		if (allowedIP === clientIP) return true;
-		// CIDR notation support (e.g., 192.168.1.0/24)
-		if (allowedIP.includes("/")) {
-			return isIPInCIDR(clientIP, allowedIP);
-		}
-		return false;
-	});
+	return ALLOWED_IPS.some((entry) => ipMatchesEntry(clientIP, entry));
 }
+
+/**
+ * A configured allowlist/proxy entry must be a valid IP or CIDR range.
+ */
+function isValidEntry(entry: string): boolean {
+	return entry.includes("/") ? ipaddr.isValidCIDR(entry) : ipaddr.isValid(entry);
+}
+
+/**
+ * Fail fast at startup on malformed config so a typo can never silently widen
+ * access. Without this, an invalid entry (e.g. "10.0.0.0/" or an IPv6 range
+ * where IPv4 was assumed) would be carried into the matcher and fail closed on
+ * every request.
+ */
+function assertValidEntries(entries: string[], source: string): void {
+	const invalid = entries.filter((entry) => !isValidEntry(entry));
+	if (invalid.length > 0) {
+		throw new Error(
+			`[Security] ${source} contains invalid IP/CIDR entries: ${invalid.join(", ")}. ` +
+				"Each entry must be a valid IPv4/IPv6 address or CIDR range (e.g. 203.0.113.5 or 10.0.0.0/24).",
+		);
+	}
+}
+
+assertValidEntries(ALLOWED_IPS, "API_ALLOWED_IPS");
+assertValidEntries(TRUSTED_PROXIES, "TRUSTED_PROXIES");
 
 /**
  * Get the real client IP address.
