@@ -1,7 +1,7 @@
 // src/services/user.service.ts
 
 import * as Sentry from "@sentry/bun";
-import { eq } from "drizzle-orm";
+import { eq, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db";
 import { users } from "../db/schema";
@@ -46,18 +46,22 @@ function transformUserToResponse(dbUser: SafeUserRow): UserResponse {
 }
 
 /**
- * Get user by email address
+ * Shared user lookup: fetch a single user by an arbitrary WHERE condition and
+ * shape it through the safe response transform. Centralizes the select list,
+ * not-found handling, and error reporting shared by the public lookups below.
  *
- * @param email - User's email address
- * @returns Promise<UserResponse | null> - User data or null if not found
- *
- * @example
- * ```typescript
- * const user = await getUserByEmail("user@example.com");
- * // Returns: { id, email, name, image, emailVerified, twoFactorEnabled }
- * ```
+ * @param where - Drizzle WHERE condition selecting at most one user
+ * @param context - Reporting context: Sentry operation tag, a human label used
+ *   in the log/breadcrumb strings ("email" / "ID"), and extra Sentry fields
  */
-export async function getUserByEmail(email: string): Promise<UserResponse | null> {
+async function findUser(
+	where: SQL,
+	context: {
+		operation: "getUserByEmail" | "getUserById";
+		label: string;
+		extra: Record<string, unknown>;
+	},
+): Promise<UserResponse | null> {
 	try {
 		const user = await db
 			.select({
@@ -71,7 +75,7 @@ export async function getUserByEmail(email: string): Promise<UserResponse | null
 				updatedAt: users.updatedAt,
 			})
 			.from(users)
-			.where(eq(users.email, email.trim().toLowerCase()))
+			.where(where)
 			.limit(1);
 
 		if (!user[0]) {
@@ -81,18 +85,18 @@ export async function getUserByEmail(email: string): Promise<UserResponse | null
 		// Transform to safe response format
 		return transformUserToResponse(user[0]);
 	} catch (error) {
-		console.error("Error fetching user by email:", error);
+		console.error(`Error fetching user by ${context.label}:`, error);
 
 		// Send to Sentry with database context
 		Sentry.captureException(error, {
 			tags: {
 				feature: "database",
-				operation: "getUserByEmail",
+				operation: context.operation,
 				table: "users",
 			},
 			extra: {
-				email: maskEmail(email),
-				query: "SELECT user by email",
+				...context.extra,
+				query: `SELECT user by ${context.label}`,
 				database: "postgresql",
 			},
 			level: "error",
@@ -100,6 +104,26 @@ export async function getUserByEmail(email: string): Promise<UserResponse | null
 
 		throw error;
 	}
+}
+
+/**
+ * Get user by email address
+ *
+ * @param email - User's email address
+ * @returns Promise<UserResponse | null> - User data or null if not found
+ *
+ * @example
+ * ```typescript
+ * const user = await getUserByEmail("user@example.com");
+ * // Returns: { id, email, name, image, emailVerified, twoFactorEnabled }
+ * ```
+ */
+export async function getUserByEmail(email: string): Promise<UserResponse | null> {
+	return findUser(eq(users.email, email.trim().toLowerCase()), {
+		operation: "getUserByEmail",
+		label: "email",
+		extra: { email: maskEmail(email) },
+	});
 }
 
 /**
@@ -115,46 +139,9 @@ export async function getUserByEmail(email: string): Promise<UserResponse | null
  * ```
  */
 export async function getUserById(userId: string): Promise<UserResponse | null> {
-	try {
-		const user = await db
-			.select({
-				id: users.id,
-				email: users.email,
-				name: users.name,
-				image: users.image,
-				emailVerified: users.emailVerified,
-				twoFactorEnabled: users.twoFactorEnabled,
-				createdAt: users.createdAt,
-				updatedAt: users.updatedAt,
-			})
-			.from(users)
-			.where(eq(users.id, userId))
-			.limit(1);
-
-		if (!user[0]) {
-			return null;
-		}
-
-		// Transform to safe response format
-		return transformUserToResponse(user[0]);
-	} catch (error) {
-		console.error("Error fetching user by ID:", error);
-
-		// Send to Sentry with database context
-		Sentry.captureException(error, {
-			tags: {
-				feature: "database",
-				operation: "getUserById",
-				table: "users",
-			},
-			extra: {
-				userId,
-				query: "SELECT user by ID",
-				database: "postgresql",
-			},
-			level: "error",
-		});
-
-		throw error;
-	}
+	return findUser(eq(users.id, userId), {
+		operation: "getUserById",
+		label: "ID",
+		extra: { userId },
+	});
 }
