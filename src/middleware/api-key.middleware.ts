@@ -87,7 +87,7 @@ function isTrustedProxy(ip: string): boolean {
  */
 export function getClientIP(c: Context): string {
 	// 1. Get the actual TCP-level connection source (unspoofable)
-	let socketIP = "unknown";
+	let socketIP: string;
 	try {
 		const connInfo = getConnInfo(c);
 		socketIP = connInfo.remote.address || "unknown";
