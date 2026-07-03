@@ -71,7 +71,7 @@ export async function getUserByEmail(email: string): Promise<UserResponse | null
 				updatedAt: users.updatedAt,
 			})
 			.from(users)
-			.where(eq(users.email, email))
+			.where(eq(users.email, email.trim().toLowerCase()))
 			.limit(1);
 
 		if (!user[0]) {
