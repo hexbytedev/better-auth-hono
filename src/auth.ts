@@ -8,7 +8,11 @@ import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { emailOTP, jwt, openAPI, twoFactor } from "better-auth/plugins";
 import { and, eq, ilike, inArray, not, or, sql } from "drizzle-orm";
-import { getAllowedOrigins, parseNumber } from "./config/app.config";
+import {
+	getAllowedOrigins,
+	OTP_EXPIRATION_SECONDS,
+	TOKEN_EXPIRATION_SECONDS,
+} from "./config/app.config";
 import { db } from "./db";
 import * as schema from "./db/schema";
 import {
@@ -38,12 +42,6 @@ const JWT_EXPIRATION_TIME = envWithDefault("JWT_EXPIRATION_TIME", "1h");
 
 // Optional: Fraud check API URL
 const FRAUD_CHECK_API_URL = process.env.FRAUD_CHECK_API_URL?.trim();
-
-// Token expiration in seconds (used for both email verification and password reset)
-const TOKEN_EXPIRATION_SECONDS = parseNumber(process.env.TOKEN_EXPIRATION_SECONDS, 3600, {
-	min: 60,
-	name: "TOKEN_EXPIRATION_SECONDS",
-});
 
 // Cross-subdomain and cookie configuration
 const CROSS_SUBDOMAIN_COOKIES_ENABLED = process.env.CROSS_SUBDOMAIN_COOKIES_ENABLED?.trim();
@@ -87,12 +85,6 @@ const EMAIL_PASSWORD_ENABLED = process.env.EMAIL_PASSWORD_ENABLED?.trim() !== "f
 
 // Email OTP feature flag (Defaults to false unless explicitly "true")
 const EMAIL_OTP_ENABLED = process.env.EMAIL_OTP_ENABLED?.trim() === "true";
-
-// OTP expiration in seconds (optional, default: 300)
-const OTP_EXPIRATION_SECONDS = parseNumber(process.env.OTP_EXPIRATION_SECONDS, 300, {
-	min: 30,
-	name: "OTP_EXPIRATION_SECONDS",
-});
 
 export const auth = betterAuth({
 	baseURL: SERVER_URL,

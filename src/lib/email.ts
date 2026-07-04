@@ -2,19 +2,13 @@
 
 import * as Sentry from "@sentry/bun";
 import { Resend } from "resend";
+import { OTP_EXPIRATION_SECONDS, TOKEN_EXPIRATION_SECONDS } from "../config/app.config";
 import { envWithDefault, requireEnv } from "./env";
 
 const RESEND_API_KEY = requireEnv("RESEND_API_KEY");
 const EMAIL_FROM = requireEnv("EMAIL_FROM");
 const COMPANY_NAME = requireEnv("COMPANY_NAME");
 const PRIMARY_COLOR_RAW = envWithDefault("PRIMARY_COLOR", "2d5a2d");
-
-const TOKEN_EXPIRATION_SECONDS = Number.parseInt(
-	envWithDefault("TOKEN_EXPIRATION_SECONDS", "3600"),
-	10,
-);
-
-const OTP_EXPIRATION_SECONDS = Number.parseInt(envWithDefault("OTP_EXPIRATION_SECONDS", "300"), 10);
 
 // Add # prefix if not present
 const PRIMARY_COLOR = PRIMARY_COLOR_RAW.startsWith("#")

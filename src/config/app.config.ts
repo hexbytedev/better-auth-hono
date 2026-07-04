@@ -63,6 +63,22 @@ export function parseNumber(
 }
 
 /**
+ * Token expiration in seconds. Default: 3600 (1 hour), minimum 60s.
+ */
+export const TOKEN_EXPIRATION_SECONDS = parseNumber(process.env.TOKEN_EXPIRATION_SECONDS, 3600, {
+	min: 60,
+	name: "TOKEN_EXPIRATION_SECONDS",
+});
+
+/**
+ * OTP expiration in seconds. Default: 300 (5 minutes), minimum 30s.
+ */
+export const OTP_EXPIRATION_SECONDS = parseNumber(process.env.OTP_EXPIRATION_SECONDS, 300, {
+	min: 30,
+	name: "OTP_EXPIRATION_SECONDS",
+});
+
+/**
  * Get application port from environment variable
  * Default: 8558, Valid range: 1-65535
  */
