@@ -32,7 +32,7 @@ function parseCommaSeparated(value: string | undefined): string[] {
  * Parse and validate a number from environment variable
  * Returns default if not provided, invalid, or out of range
  */
-function parseNumber(
+export function parseNumber(
 	value: string | undefined,
 	defaultValue: number,
 	options?: { min?: number; max?: number; name?: string },
