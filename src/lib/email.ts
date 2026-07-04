@@ -23,19 +23,26 @@ function getResend(): Resend {
 
 // Helper to convert seconds to human-readable format
 function formatExpirationTime(seconds: number): string {
+	// Safety net for non-finite / zero / negative durations. With the range
+	// validation in app.config.ts these never reach here, but guard anyway so a
+	// misconfiguration can't render "0 second" / "-30 seconds" / "NaN second".
+	if (!Number.isFinite(seconds) || seconds <= 0) {
+		return "a short time";
+	}
+
 	const hours = Math.floor(seconds / 3600);
 	const minutes = Math.floor((seconds % 3600) / 60);
 
 	if (hours > 0 && minutes > 0) {
-		return `${hours} hour${hours > 1 ? "s" : ""} and ${minutes} minute${minutes > 1 ? "s" : ""}`;
+		return `${hours} hour${hours !== 1 ? "s" : ""} and ${minutes} minute${minutes !== 1 ? "s" : ""}`;
 	}
 	if (hours > 0) {
-		return `${hours} hour${hours > 1 ? "s" : ""}`;
+		return `${hours} hour${hours !== 1 ? "s" : ""}`;
 	}
 	if (minutes > 0) {
-		return `${minutes} minute${minutes > 1 ? "s" : ""}`;
+		return `${minutes} minute${minutes !== 1 ? "s" : ""}`;
 	}
-	return `${seconds} second${seconds > 1 ? "s" : ""}`;
+	return `${seconds} second${seconds !== 1 ? "s" : ""}`;
 }
 
 function escapeHtml(value: string): string {
