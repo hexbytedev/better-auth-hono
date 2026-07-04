@@ -79,6 +79,9 @@ const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID?.trim();
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET?.trim();
 const isGithubEnabled = Boolean(GITHUB_CLIENT_ID && GITHUB_CLIENT_SECRET);
 
+// Expo app scheme for deep-link trusted origins
+const APP_SCHEME = process.env.APP_SCHEME?.trim();
+
 // Check if email/password authentication should be enabled (Defaults to true unless explicitly "false")
 const EMAIL_PASSWORD_ENABLED = process.env.EMAIL_PASSWORD_ENABLED?.trim() !== "false";
 
@@ -96,7 +99,7 @@ export const auth = betterAuth({
 	trustedOrigins: [
 		...allowedOrigins,
 		// Expo app scheme for deep link authentication
-		...(process.env.APP_SCHEME ? [`${process.env.APP_SCHEME}://`] : []),
+		...(APP_SCHEME ? [`${APP_SCHEME}://`] : []),
 		// Development mode - Expo's exp:// scheme with local IP ranges
 		...(process.env.NODE_ENV === "development"
 			? ["exp://", "exp://**", "exp://192.168.*.*:*/**"]
