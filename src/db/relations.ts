@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { accounts, passkeys, sessions, twoFactors, users } from "./schema";
+import { accounts, passkeys, sessions, twoFactors, userEmails, users } from "./schema";
 
 // ============================================
 // USER RELATIONS
@@ -13,6 +13,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
 		references: [twoFactors.userId],
 	}),
 	passkeys: many(passkeys),
+	userEmails: many(userEmails),
 }));
 
 // ============================================
@@ -55,6 +56,17 @@ export const twoFactorsRelations = relations(twoFactors, ({ one }) => ({
 export const passkeysRelations = relations(passkeys, ({ one }) => ({
 	user: one(users, {
 		fields: [passkeys.userId],
+		references: [users.id],
+	}),
+}));
+
+// ============================================
+// USER EMAIL RELATIONS
+// ============================================
+
+export const userEmailsRelations = relations(userEmails, ({ one }) => ({
+	user: one(users, {
+		fields: [userEmails.userId],
 		references: [users.id],
 	}),
 }));
