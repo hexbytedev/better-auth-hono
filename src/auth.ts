@@ -53,6 +53,23 @@ const COOKIE_SECURE = process.env.COOKIE_SECURE?.trim();
 const COOKIE_HTTP_ONLY = process.env.COOKIE_HTTP_ONLY?.trim();
 const COOKIE_PARTITIONED = process.env.COOKIE_PARTITIONED?.trim();
 
+// Normalize SameSite to a valid lowercase value; anything else is left unset so
+// Better-Auth's own default applies instead of an invalid cast.
+const COOKIE_SAME_SITE_RAW = COOKIE_SAME_SITE?.toLowerCase();
+const COOKIE_SAME_SITE_NORMALIZED =
+	COOKIE_SAME_SITE_RAW === "strict" ||
+	COOKIE_SAME_SITE_RAW === "lax" ||
+	COOKIE_SAME_SITE_RAW === "none"
+		? COOKIE_SAME_SITE_RAW
+		: undefined;
+
+// Browsers reject SameSite=None cookies that are not also Secure.
+if (COOKIE_SAME_SITE_NORMALIZED === "none" && COOKIE_SECURE && COOKIE_SECURE !== "true") {
+	console.warn(
+		"[Cookies] COOKIE_SAME_SITE=none requires COOKIE_SECURE=true; browsers reject SameSite=None cookies without the Secure attribute.",
+	);
+}
+
 // --- Dynamic Provider Flags ---
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID?.trim();
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET?.trim();
@@ -527,10 +544,13 @@ export const auth = betterAuth({
 			domain: CROSS_SUBDOMAIN_COOKIES_DOMAIN,
 		},
 		defaultCookieAttributes: {
-			sameSite: COOKIE_SAME_SITE as "strict" | "lax" | "none",
-			secure: COOKIE_SECURE === "true",
-			httpOnly: COOKIE_HTTP_ONLY === "true",
-			partitioned: COOKIE_PARTITIONED === "true",
+			// Only override attributes that are explicitly configured; leave the rest to
+			// Better-Auth's (safer) defaults instead of forcing false/undefined when the
+			// env var is unset.
+			...(COOKIE_SAME_SITE_NORMALIZED ? { sameSite: COOKIE_SAME_SITE_NORMALIZED } : {}),
+			...(COOKIE_SECURE ? { secure: COOKIE_SECURE === "true" } : {}),
+			...(COOKIE_HTTP_ONLY ? { httpOnly: COOKIE_HTTP_ONLY === "true" } : {}),
+			...(COOKIE_PARTITIONED ? { partitioned: COOKIE_PARTITIONED === "true" } : {}),
 		},
 		database: {
 			generateId: false,
