@@ -50,14 +50,13 @@ export function parseNumber(
 	const min = options?.min ?? Number.MIN_SAFE_INTEGER;
 	const max = options?.max ?? Number.MAX_SAFE_INTEGER;
 
-	if (parsed < min) {
-		console.warn(`${options?.name || "Value"} ${parsed} is below minimum ${min}. Using minimum.`);
-		return min;
-	}
-
-	if (parsed > max) {
-		console.warn(`${options?.name || "Value"} ${parsed} exceeds maximum ${max}. Using maximum.`);
-		return max;
+	// Out-of-range: fall back to the default rather than clamp, so a misconfigured
+	// value never silently becomes a surprising boundary (e.g. APP_PORT=0 -> 1).
+	if (parsed < min || parsed > max) {
+		console.warn(
+			`${options?.name || "Value"} ${parsed} is outside [${min}, ${max}]. Using default: ${defaultValue}`,
+		);
+		return defaultValue;
 	}
 
 	return parsed;
