@@ -1,7 +1,15 @@
 export function maskEmail(email: string): string {
-	const [localPart, domain] = email.split("@");
-	if (!localPart || !domain) return "[redacted-email]";
-	return `${localPart.slice(0, 2)}***@${domain}`;
+	const atIndex = email.indexOf("@");
+	// Need at least one local-part char before "@" and one domain char after.
+	if (atIndex <= 0 || atIndex === email.length - 1) return "[redacted-email]";
+
+	const localPart = email.slice(0, atIndex);
+	const domain = email.slice(atIndex + 1);
+
+	// Reveal fewer characters for shorter local parts so the whole local part is
+	// never disclosed; a 1-char local part reveals nothing.
+	const revealCount = localPart.length <= 1 ? 0 : localPart.length <= 3 ? 1 : 2;
+	return `${localPart.slice(0, revealCount)}***@${domain}`;
 }
 
 export function maskIpAddress(raw: string): string {
