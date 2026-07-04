@@ -151,6 +151,9 @@ app.get("/", (c) => {
 // Export for Bun
 export default {
 	port: getAppPort(),
-	host: getAppHost(),
+	// `hostname` is Bun's documented (and typed) serve option for the bind address,
+	// fed by APP_HOST. Bun also accepts a Node-style `host` alias at runtime, but we
+	// use the documented key.
+	hostname: getAppHost(),
 	fetch: app.fetch,
 };
