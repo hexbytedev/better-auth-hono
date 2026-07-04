@@ -338,10 +338,15 @@ export const auth = betterAuth({
 					verified: true;
 				}>;
 				for (const e of filteredInput) {
-					if (seen.has(e.email)) continue;
-					seen.add(e.email);
+					// Normalize casing so user_emails stays consistent with the lowercased
+					// users.email Better-Auth writes, and case-variant GitHub addresses
+					// (e.g. John@x.com vs john@x.com) collapse to a single row instead of
+					// slipping past the case-sensitive (user_id, email) unique.
+					const email = e.email.toLowerCase();
+					if (seen.has(email)) continue;
+					seen.add(email);
 					filtered.push({
-						email: e.email,
+						email,
 						primary: Boolean(e.primary),
 						verified: true,
 					});
