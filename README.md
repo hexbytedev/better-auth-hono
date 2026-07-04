@@ -14,7 +14,7 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 - Drizzle ORM schema with UUID primary keys and indices optimized for fast lookups (see `src/db/schema.ts`).
 - JWT support for microservices (`src/auth.ts`) and an internal Basic-Auth protected user lookup API (`GET /api/users/id/:id`, `POST /api/users/email`).
 - Email OTP authentication: sign-in, email verification, password reset, and email change via one-time codes.
-- Sign up fraud protection: during registration, emails and IP addresses are checked against the [DeGhost fraud detection API](https://deghost.hexbyte.dev) (API endpoint: https://deghostapi.hexbyte.dev) to block disposable emails, known abusive domains, and suspicious IPs.
+- Sign up fraud protection: during registration, emails and IP addresses are checked against the [DeGhost fraud detection API](https://deghost.hexbyte.dev) (API endpoint: <https://deghostapi.hexbyte.dev>) to block disposable emails, known abusive domains, and suspicious IPs.
 
 ## Features at a Glance
 
@@ -106,10 +106,73 @@ GitHub pull requests also run:
 
 - Fail-fast env validation prevents accidental misconfiguration.
 - Sentry captures structured errors with tags for faster triage.
-- Sign up hooks consult the [DeGhost fraud detection API](https://deghost.hexbyte.dev) (API endpoint: https://deghostapi.hexbyte.dev) to screen registrations — emails are checked against known disposable / abusive domains, and IPs are checked for proxy/VPN and threat signals.
+- Sign up hooks consult the [DeGhost fraud detection API](https://deghost.hexbyte.dev) (API endpoint: <https://deghostapi.hexbyte.dev>) to screen registrations — emails are checked against known disposable / abusive domains, and IPs are checked for proxy/VPN and threat signals.
 - Email OTP is opt-in (`EMAIL_OTP_ENABLED=true`) with configurable expiry and hashed OTP storage.
 - Basic Auth middleware protects internal endpoints and uses timing-safe comparisons.
 - `/api/users/*` routes are mounted only when both `API_AUTH_USER` and `API_AUTH_PASSWORD` are configured.
+
+### Running behind nginx / Cloudflare
+
+`getClientIP()` treats the reverse proxy as the trust boundary: it reads the unspoofable TCP socket address and only honors the `X-Real-IP` / `X-Forwarded-For` headers when the connection originates from a `TRUSTED_PROXIES` entry (exact IP or CIDR, IPv4 or IPv6). Set `TRUSTED_PROXIES` to the address the app actually sees the proxy connect from (for a co-located nginx that is usually `127.0.0.1` and/or `::1`).
+
+When the app runs behind **Cloudflare → nginx → app**, let nginx restore the real visitor IP from Cloudflare's `CF-Connecting-IP` header but only trust that header from Cloudflare's published edge ranges and forward it to the app as `X-Real-IP`. The app then trusts nginx (via `TRUSTED_PROXIES`), and nginx is the single place responsible for deriving the real IP.
+
+```nginx
+# /etc/nginx/conf.d/cloudflare-real-ip.conf
+# Restore the real client IP from Cloudflare, trusting CF-Connecting-IP
+# ONLY from Cloudflare's edge ranges (keep this list in sync with
+# https://www.cloudflare.com/ips-v4 and https://www.cloudflare.com/ips-v6).
+set_real_ip_from 173.245.48.0/20;
+set_real_ip_from 103.21.244.0/22;
+set_real_ip_from 103.22.200.0/22;
+set_real_ip_from 103.31.4.0/22;
+set_real_ip_from 141.101.64.0/18;
+set_real_ip_from 108.162.192.0/18;
+set_real_ip_from 190.93.240.0/20;
+set_real_ip_from 188.114.96.0/20;
+set_real_ip_from 197.234.240.0/22;
+set_real_ip_from 198.41.128.0/17;
+set_real_ip_from 162.158.0.0/15;
+set_real_ip_from 104.16.0.0/13;
+set_real_ip_from 104.24.0.0/14;
+set_real_ip_from 172.64.0.0/13;
+set_real_ip_from 131.0.72.0/22;
+set_real_ip_from 2400:cb00::/32;
+set_real_ip_from 2606:4700::/32;
+set_real_ip_from 2803:f800::/32;
+set_real_ip_from 2405:b500::/32;
+set_real_ip_from 2405:8100::/32;
+set_real_ip_from 2a06:98c0::/29;
+set_real_ip_from 2c0f:f248::/32;
+
+real_ip_header CF-Connecting-IP;   # $remote_addr becomes the true visitor IP
+
+
+# server block for Cloudflare → nginx → app
+# /etc/nginx/conf.d/better-auth-hono.conf
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name auth.example.com;
+
+    # ssl_certificate / ssl_certificate_key ...
+
+    location / {
+        proxy_pass         http://10.0.0.2:8558;
+        proxy_http_version 1.1;
+
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;      # restored client IP from CF-Connecting-IP
+        proxy_set_header   X-Forwarded-For   $remote_addr;      # single trusted hop
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   X-Forwarded-Host  $host;
+        proxy_set_header   X-Forwarded-Port  $server_port;
+    }
+}
+```
+
+With this in place, set `TRUSTED_PROXIES=127.0.0.1` (and `::1` if nginx dials the app over IPv6). Without Cloudflare, drop the `set_real_ip_from` / `real_ip_header` block and keep the `server { … }` section; nginx sets `X-Real-IP` from its own `$remote_addr`.
 
 ### Development notes
 

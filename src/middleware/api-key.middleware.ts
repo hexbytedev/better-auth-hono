@@ -52,6 +52,15 @@ function parseIP(value: string): IPAddress | null {
 }
 
 /**
+ * Normalize a client IP so the same host is represented identically no matter
+ * which resolution path produced it. Strip the IPv4-mapped IPv6 prefix
+ * (::ffff:1.2.3.4 -> 1.2.3.4), matching how the raw socket address is handled.
+ */
+function normalizeIP(value: string): string {
+	return value.trim().replace(/^::ffff:/i, "");
+}
+
+/**
  * True if `clientIP` matches a whitelist/proxy `entry`, which may be a bare IP
  * (exact match) or a CIDR range. IPv4 and IPv6 never cross-match, and any
  * malformed input returns false.
@@ -72,7 +81,7 @@ function ipMatchesEntry(clientIP: string, entry: string): boolean {
 		if (addr.kind() !== entryAddr.kind()) return false;
 		return addr.toNormalizedString() === entryAddr.toNormalizedString();
 	} catch {
-		// Malformed CIDR / kind mismatch inside ipaddr.js — fail closed.
+		// Malformed CIDR / kind mismatch inside ipaddr.js, fail closed.
 		return false;
 	}
 }
@@ -123,15 +132,24 @@ assertValidEntries(TRUSTED_PROXIES, "TRUSTED_PROXIES");
  * Get the real client IP address.
  *
  * SECURITY MODEL:
- * 1. Use getConnInfo() to get the TCP-level remote address — this
+ * 1. Use getConnInfo() to get the TCP-level remote address. This
  *    CANNOT be spoofed via HTTP headers.
- * 2. If the TCP connection comes from a trusted proxy (nginx),
- *    read X-Real-IP (set by nginx to $remote_addr) — the authoritative
- *    single-IP header that nginx overwrites.
+ * 2. If the TCP connection comes from a trusted proxy (a TRUSTED_PROXIES
+ *    entry, e.g. nginx), read X-Real-IP, the authoritative single-IP
+ *    header the proxy sets from its own $remote_addr.
  * 3. If the TCP connection is NOT from a trusted proxy (direct access,
- *    bypassing nginx), use the raw TCP remote address instead.
- * 4. CF-Connecting-IP is NEVER checked — Cloudflare is not in front,
- *    so any value in that header is attacker-supplied.
+ *    bypassing the proxy), use the raw TCP remote address instead and
+ *    ignore all forwarded headers.
+ *
+ * The proxy is the trust boundary: forwarded headers are trusted only when
+ * they arrive from a TRUSTED_PROXIES peer. When deploying behind Cloudflare,
+ * terminate that trust at nginx: have nginx restore the real visitor IP for
+ * Cloudflare's edge ranges and pass it on as X-Real-IP, then set
+ * TRUSTED_PROXIES to nginx. See "Running behind nginx / Cloudflare" in the
+ * README for a ready-to-use config.
+ *
+ * Every return path runs through normalizeIP() so the same host is
+ * represented identically regardless of which branch produced it.
  */
 export function getClientIP(c: Context): string {
 	// 1. Get the actual TCP-level connection source (unspoofable)
@@ -145,36 +163,36 @@ export function getClientIP(c: Context): string {
 	}
 
 	// 2. If the direct TCP connection is from a trusted proxy,
-	//    trust the X-Real-IP header that nginx set from $remote_addr.
+	//    trust the X-Real-IP header the proxy set from its $remote_addr.
 	if (socketIP !== "unknown" && isTrustedProxy(socketIP)) {
 		const realIP = c.req.header("x-real-ip");
 		if (realIP) {
-			return realIP.trim();
+			return normalizeIP(realIP);
 		}
 
-		// Fallback: X-Forwarded-For — only safe here because nginx
+		// Fallback: X-Forwarded-For; only safe here because the proxy
 		// overwrites it with $remote_addr (not $proxy_add_x_forwarded_for).
 		const forwardedFor = c.req.header("x-forwarded-for");
 		if (forwardedFor) {
-			return forwardedFor.split(",")[0].trim();
+			return normalizeIP(forwardedFor.split(",")[0]);
 		}
 	}
 
-	// 3. Not a trusted proxy (direct connection bypassing nginx).
-	//    Use the raw TCP address — this is the best we can do.
+	// 3. Not a trusted proxy (direct connection bypassing the proxy).
+	//    Use the raw TCP address; this is the best we can do.
 	//    Do NOT read any forwarded headers in this path.
 	if (socketIP !== "unknown") {
-		return socketIP.replace(/^::ffff:/, "");
+		return normalizeIP(socketIP);
 	}
 
 	// 4. Last resort: X-Real-IP only if we couldn't get socket info.
-	//    This is a degraded state — log a warning.
+	//    This is a degraded state; log a warning.
 	const realIP = c.req.header("x-real-ip");
 	if (realIP) {
 		console.warn(
 			"[Security] Could not determine TCP source; falling back to X-Real-IP without proxy validation.",
 		);
-		return realIP.trim();
+		return normalizeIP(realIP);
 	}
 
 	return "unknown";

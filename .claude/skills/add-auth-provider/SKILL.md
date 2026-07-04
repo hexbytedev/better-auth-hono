@@ -21,8 +21,8 @@ The active auth surface depends on configured env. Gate new capabilities the sam
 ## Social provider
 
 Add under `socialProviders` using the conditional-spread pattern, mirroring `google`/`github`. Set
-`redirectURI: \`${SERVER_URL}/api/auth/callback/<provider>\``. If OAuth needs extra origins (e.g. an
-Expo scheme), extend`trustedOrigins`.
+`redirectURI` to `${SERVER_URL}/api/auth/callback/<provider>` (a template literal, as in the
+`google`/`github` entries). If OAuth needs extra origins (e.g. an Expo scheme), extend `trustedOrigins`.
 
 ## Plugin
 

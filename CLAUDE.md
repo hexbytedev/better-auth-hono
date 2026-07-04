@@ -52,7 +52,7 @@ A custom Basic-Auth-protected lookup API: `GET /api/users/id/:id` and `POST /api
 
 ### Middleware (`src/middleware/api-key.middleware.ts`)
 
-`validateBasicAuth` uses `timingSafeEqual` (via `safeCompare`) for credential comparison. An optional IP whitelist (`API_ALLOWED_IPS`, comma-separated, supports CIDR) is layered on top of Basic Auth when configured — it does not work without Basic Auth enabled. Client IPs come from `getClientIP()`, which reads the unspoofable TCP socket address and only trusts `X-Real-IP` / `X-Forwarded-For` when the connection originates from a `TRUSTED_PROXIES` entry (exact IP or IPv4 CIDR); `CF-Connecting-IP` is never trusted.
+`validateBasicAuth` uses `timingSafeEqual` (via `safeCompare`) for credential comparison. An optional IP whitelist (`API_ALLOWED_IPS`, comma-separated, supports CIDR) is layered on top of Basic Auth when configured — it does not work without Basic Auth enabled. Client IPs come from `getClientIP()`, which reads the unspoofable TCP socket address and only trusts `X-Real-IP` / `X-Forwarded-For` when the connection originates from a `TRUSTED_PROXIES` entry (exact IP or CIDR, IPv4 or IPv6, matched via `ipaddr.js`). The reverse proxy is the trust boundary; for Cloudflare deployments nginx restores the real visitor IP and forwards it as `X-Real-IP` (see "Running behind nginx / Cloudflare" in the README).
 
 ### Email (`src/lib/email.ts`)
 
