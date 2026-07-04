@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { Context, Next } from "hono";
 import { getConnInfo } from "hono/bun";
 import * as ipaddr from "ipaddr.js";
@@ -201,14 +201,14 @@ export function getClientIP(c: Context): string {
 // ── Auth Validation ────────────────────────────────────────────────
 
 function safeCompare(a: string, b: string): boolean {
-	const bufA = Buffer.from(a);
-	const bufB = Buffer.from(b);
+	// Hash both inputs to a fixed 32-byte digest before comparing. This keeps
+	// the timing-safe compare over equal-length buffers regardless of the input
+	// lengths, so it never returns early on a length mismatch and never leaks
+	// the credential length through timing.
+	const hashA = createHash("sha256").update(a).digest();
+	const hashB = createHash("sha256").update(b).digest();
 
-	if (bufA.length !== bufB.length) {
-		return false;
-	}
-
-	return timingSafeEqual(bufA, bufB);
+	return timingSafeEqual(hashA, hashB);
 }
 
 /**
@@ -289,7 +289,11 @@ export const validateBasicAuth = async (c: Context, next: Next) => {
 		const username = credentials.slice(0, separatorIndex);
 		const password = credentials.slice(separatorIndex + 1);
 
-		if (!safeCompare(username, AUTH_USER!) || !safeCompare(password, AUTH_PASS!)) {
+		// Evaluate both comparisons unconditionally (no `||` short-circuit) so a
+		// valid username cannot be told apart from an invalid one by timing.
+		const usernameOk = safeCompare(username, AUTH_USER!);
+		const passwordOk = safeCompare(password, AUTH_PASS!);
+		if (!(usernameOk && passwordOk)) {
 			console.warn(`[Security] Failed login attempt from IP: ${getClientIP(c)}`);
 
 			c.header("WWW-Authenticate", 'Basic realm="API Access"');
