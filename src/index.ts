@@ -10,12 +10,31 @@ const SENTRY_DSN = process.env.SENTRY_DSN?.trim();
 const SENTRY_TRACES_SAMPLE_RATE = process.env.SENTRY_TRACES_SAMPLE_RATE?.trim();
 const SENTRY_SEND_DEFAULT_PII = process.env.SENTRY_SEND_DEFAULT_PII?.trim();
 
+// Validate the traces sample rate: it must be a finite number in [0, 1]. A
+// malformed (NaN) or out-of-range value is dropped so it does not silently
+// disable tracing or trigger Sentry's own internal warnings.
+// (parseNumber from app.config is integer-only, so a float rate is parsed here.)
+const parsedTracesSampleRate = SENTRY_TRACES_SAMPLE_RATE
+	? Number.parseFloat(SENTRY_TRACES_SAMPLE_RATE)
+	: undefined;
+const tracesSampleRate =
+	parsedTracesSampleRate !== undefined &&
+	Number.isFinite(parsedTracesSampleRate) &&
+	parsedTracesSampleRate >= 0 &&
+	parsedTracesSampleRate <= 1
+		? parsedTracesSampleRate
+		: undefined;
+
+if (SENTRY_TRACES_SAMPLE_RATE && tracesSampleRate === undefined) {
+	console.warn(
+		`Invalid SENTRY_TRACES_SAMPLE_RATE: "${SENTRY_TRACES_SAMPLE_RATE}"; expected a number between 0 and 1. Tracing left at the Sentry default.`,
+	);
+}
+
 if (SENTRY_DSN) {
 	Sentry.init({
 		dsn: SENTRY_DSN,
-		...(SENTRY_TRACES_SAMPLE_RATE
-			? { tracesSampleRate: parseFloat(SENTRY_TRACES_SAMPLE_RATE) }
-			: {}),
+		...(tracesSampleRate !== undefined ? { tracesSampleRate } : {}),
 		sendDefaultPii: SENTRY_SEND_DEFAULT_PII === "true",
 	});
 	console.log("Sentry initialized with DSN:", `${SENTRY_DSN.substring(0, 20)}...`);
