@@ -513,16 +513,18 @@ export const auth = betterAuth({
 				audience: CLIENT_URL, // Client URL for audience
 				expirationTime: JWT_EXPIRATION_TIME,
 				definePayload: async (session) => {
-					// Get user data from database
-					const userData = await db.query.users.findFirst({
-						where: (users, { eq }) => eq(users.id, session.user.id),
-					});
-
-					// Check if user has email/password account
-					const emailPasswordAccount = await db.query.accounts.findFirst({
-						where: (accounts, { eq, and }) =>
-							and(eq(accounts.userId, session.user.id), eq(accounts.providerId, "credential")),
-					});
+					// Fetch the user row and the email/password account in parallel; the two
+					// queries are independent, so awaiting them sequentially only added a
+					// round-trip of latency to every JWT issuance.
+					const [userData, emailPasswordAccount] = await Promise.all([
+						db.query.users.findFirst({
+							where: (users, { eq }) => eq(users.id, session.user.id),
+						}),
+						db.query.accounts.findFirst({
+							where: (accounts, { eq, and }) =>
+								and(eq(accounts.userId, session.user.id), eq(accounts.providerId, "credential")),
+						}),
+					]);
 
 					return {
 						user: {
