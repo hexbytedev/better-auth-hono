@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import type { Context, Next } from "hono";
 import { getConnInfo } from "hono/bun";
 import * as ipaddr from "ipaddr.js";
@@ -207,21 +207,21 @@ export function getClientIP(c: Context): string {
 
 // ── Auth Validation ────────────────────────────────────────────────
 
-// Random per-process key for the comparison HMAC. It never leaves the process
-// and only needs to be identical across the two digests of a single compare, so
-// generating it once at startup is sufficient.
-const COMPARE_HMAC_KEY = randomBytes(32);
+// Per-process salt and key length for the comparison KDF. The salt only needs
+// to be identical across the two digests of a single comparison, so a random
+// value generated once at startup is sufficient — and it keeps the digests
+// unpredictable across restarts.
+const COMPARE_SALT = randomBytes(16);
+const COMPARE_KEYLEN = 32;
 
 function safeCompare(a: string, b: string): boolean {
-	// HMAC both inputs to a fixed 32-byte digest before comparing. This keeps
-	// the timing-safe compare over equal-length buffers regardless of the input
-	// lengths, so it never returns early on a length mismatch and never leaks
-	// the credential length through timing. A keyed HMAC (not a bare hash) is
-	// used so this is not a password-storage pattern: the digests are only ever
-	// compared to each other, never persisted, and the random key makes them
-	// unpredictable to an attacker.
-	const hashA = createHmac("sha256", COMPARE_HMAC_KEY).update(a).digest();
-	const hashB = createHmac("sha256", COMPARE_HMAC_KEY).update(b).digest();
+	// Derive a fixed-length key from each input with scrypt (a memory-hard
+	// password-hashing scheme) before the timing-safe compare. The fixed-length
+	// digests keep timingSafeEqual over equal-length buffers regardless of
+	// input length: it never returns early on a length mismatch and never leaks
+	// the credential length through timing.
+	const hashA = scryptSync(a, COMPARE_SALT, COMPARE_KEYLEN);
+	const hashB = scryptSync(b, COMPARE_SALT, COMPARE_KEYLEN);
 
 	return timingSafeEqual(hashA, hashB);
 }
