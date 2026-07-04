@@ -2,6 +2,9 @@
 
 const missing = new Set<string>();
 
+// Flipped by checkEnv().
+let checked = false;
+
 /**
  * Reads a required environment variable.
  *
@@ -18,10 +21,21 @@ const missing = new Set<string>();
  * option validation that throws on `""`, no writing the placeholder anywhere
  * observable. Defer such work behind a lazy getter (see `getResend()` in
  * `lib/email.ts`) so it never executes with placeholder config.
+ *
+ * The accumulate-and-defer path only applies *before* `checkEnv()` runs. A miss
+ * after the gate has already passed (a lazily/dynamically imported module, a
+ * worker, a request-scope caller) can no longer be reported, so it throws
+ * immediately instead of silently returning a placeholder.
  */
 export function requireEnv(name: string): string {
 	const value = process.env[name]?.trim();
 	if (!value) {
+		if (checked) {
+			throw new Error(
+				`Required env var ${name} accessed after checkEnv() but is not set. ` +
+					`Call requireEnv at module scope so it is validated by the startup gate.`,
+			);
+		}
 		missing.add(name);
 		return "";
 	}
@@ -43,6 +57,7 @@ export function optionalEnv(name: string): string | undefined {
 }
 
 export function checkEnv(): void {
+	checked = true;
 	if (missing.size === 0) return;
 
 	const vars = Array.from(missing).sort();
