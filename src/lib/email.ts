@@ -17,8 +17,10 @@ const PRIMARY_COLOR = PRIMARY_COLOR_RAW.startsWith("#")
 
 // Deferred to avoid crash during module init when env vars are missing.
 // By the time sendEmail runs, checkEnv() has already validated all requireEnv() calls.
+let resend: Resend | undefined;
 function getResend(): Resend {
-	return new Resend(RESEND_API_KEY);
+	resend ??= new Resend(RESEND_API_KEY);
+	return resend;
 }
 
 // Helper to convert seconds to human-readable format
