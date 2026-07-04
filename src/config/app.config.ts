@@ -84,20 +84,40 @@ export function getAppHost(): string | undefined {
 }
 
 /**
- * Get allowed origins from environment variables
- * Trims all values to prevent whitespace issues
+ * Normalize a configured origin to the exact form a browser sends in the Origin
+ * header (scheme://host[:port], lowercased, no path or trailing slash), so the
+ * CORS / trustedOrigins exact-match comparison works. Returns null for anything
+ * that is not a usable absolute web origin.
+ */
+function normalizeOrigin(value: string): string | null {
+	try {
+		const origin = new URL(value).origin;
+		// `new URL(...).origin` is the string "null" for opaque origins (non-web
+		// schemes); never allow that, or a request with `Origin: null` would match.
+		if (origin === "null") {
+			console.warn(`[CORS] Ignoring origin with no usable value: "${value}"`);
+			return null;
+		}
+		return origin;
+	} catch {
+		console.warn(`[CORS] Ignoring invalid origin entry: "${value}"`);
+		return null;
+	}
+}
+
+/**
+ * Get allowed origins from environment variables, normalized to the exact form
+ * browsers send (scheme://host[:port]) so the CORS / trustedOrigins comparison
+ * works even if CLIENT_URL/ALLOWED_ORIGINS have a trailing slash, path, or
+ * mixed case.
  */
 export function getAllowedOrigins(): string[] {
-	const additionalOrigins = parseCommaSeparated(process.env.ALLOWED_ORIGINS);
+	const raw = [CLIENT_URL, ...parseCommaSeparated(process.env.ALLOWED_ORIGINS)].filter(
+		(value) => value.length > 0,
+	);
 
-	const origins: string[] = [];
-
-	if (CLIENT_URL) {
-		origins.push(CLIENT_URL);
-	}
-
-	origins.push(...additionalOrigins);
+	const normalized = raw.map(normalizeOrigin).filter((origin): origin is string => origin !== null);
 
 	// Remove duplicates
-	return origins.filter((origin, index, self) => self.indexOf(origin) === index);
+	return [...new Set(normalized)];
 }
