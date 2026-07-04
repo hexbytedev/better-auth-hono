@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { Context, Next } from "hono";
 import { getConnInfo } from "hono/bun";
 import * as ipaddr from "ipaddr.js";
@@ -207,13 +207,21 @@ export function getClientIP(c: Context): string {
 
 // ── Auth Validation ────────────────────────────────────────────────
 
+// Random per-process key for the comparison HMAC. It never leaves the process
+// and only needs to be identical across the two digests of a single compare, so
+// generating it once at startup is sufficient.
+const COMPARE_HMAC_KEY = randomBytes(32);
+
 function safeCompare(a: string, b: string): boolean {
-	// Hash both inputs to a fixed 32-byte digest before comparing. This keeps
+	// HMAC both inputs to a fixed 32-byte digest before comparing. This keeps
 	// the timing-safe compare over equal-length buffers regardless of the input
 	// lengths, so it never returns early on a length mismatch and never leaks
-	// the credential length through timing.
-	const hashA = createHash("sha256").update(a).digest();
-	const hashB = createHash("sha256").update(b).digest();
+	// the credential length through timing. A keyed HMAC (not a bare hash) is
+	// used so this is not a password-storage pattern: the digests are only ever
+	// compared to each other, never persisted, and the random key makes them
+	// unpredictable to an attacker.
+	const hashA = createHmac("sha256", COMPARE_HMAC_KEY).update(a).digest();
+	const hashB = createHmac("sha256", COMPARE_HMAC_KEY).update(b).digest();
 
 	return timingSafeEqual(hashA, hashB);
 }
