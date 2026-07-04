@@ -313,3 +313,6 @@ export type NewTwoFactor = typeof twoFactors.$inferInsert;
 export type Passkey = typeof passkeys.$inferSelect;
 export type NewPasskey = typeof passkeys.$inferInsert;
 export type Jwks = typeof jwks.$inferSelect;
+export type NewJwks = typeof jwks.$inferInsert;
+export type UserEmail = typeof userEmails.$inferSelect;
+export type NewUserEmail = typeof userEmails.$inferInsert;
