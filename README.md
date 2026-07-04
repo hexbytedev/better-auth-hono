@@ -107,7 +107,8 @@ GitHub pull requests also run:
 - Fail-fast env validation prevents accidental misconfiguration.
 - Sentry captures structured errors with tags for faster triage.
 - Sign up fraud screening runs only when `FRAUD_CHECK_API_URL` is set (the [DeGhost fraud detection API](https://deghost.hexbyte.dev), endpoint <https://deghostapi.hexbyte.dev>). It is **fail-closed on the email**: the remote must explicitly allow the email (HTTP 200) or the signup is blocked, including when the API is unreachable or returns an error. The client IP is a secondary signal (proxy/VPN and threat checks) that blocks only on an explicit threat verdict.
-- Email OTP is opt-in (`EMAIL_OTP_ENABLED=true`) with configurable expiry and hashed OTP storage.
+- Fraud screening covers only the email/password signup (`/sign-up/email`); social (Google/GitHub) signup is intentionally unscreened because the OAuth provider is responsible for handling fraudulent/abusive accounts.
+- Email OTP is opt-in (`EMAIL_OTP_ENABLED=true`) and sign-in only (`disableSignUp`, so it cannot create accounts), with configurable expiry and hashed OTP storage.
 - Basic Auth middleware protects internal endpoints and uses timing-safe comparisons.
 - `/api/users/*` routes are mounted only when both `API_AUTH_USER` and `API_AUTH_PASSWORD` are configured.
 

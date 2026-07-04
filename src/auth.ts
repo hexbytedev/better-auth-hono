@@ -108,7 +108,12 @@ export const auth = betterAuth({
 
 	hooks: {
 		before: createAuthMiddleware(async (ctx) => {
-			// Check for email/password signup
+			// Fraud screening guards only the email/password signup (/sign-up/email),
+			// the single self-serve account-creation path we screen. Social signup
+			// (Google/GitHub) is intentionally NOT screened here: the OAuth provider
+			// is responsible for detecting and handling fraudulent/abusive accounts on
+			// its side. Email-OTP is configured sign-in only (disableSignUp: true on the
+			// emailOTP plugin), so it cannot create new accounts and needs no screening.
 			if (ctx.path === "/sign-up/email" && ctx.method === "POST") {
 				const body = ctx.body;
 				const email = body?.email;
@@ -444,6 +449,11 @@ export const auth = betterAuth({
 					emailOTP({
 						storeOTP: "hashed",
 						expiresIn: OTP_EXPIRATION_SECONDS,
+						// Sign-in only: OTP must not create new accounts. Otherwise it would be
+						// an account-creation path that bypasses the /sign-up/email fraud screen.
+						// Existing users can still sign in with OTP; unknown emails get no OTP
+						// and cannot be signed up.
+						disableSignUp: true,
 						async sendVerificationOTP({ email, otp, type }) {
 							sendOtpEmail(email, otp, type).catch((error) => {
 								Sentry.captureException(error, {
