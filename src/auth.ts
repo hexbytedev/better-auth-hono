@@ -127,11 +127,14 @@ export const auth = betterAuth({
 							},
 						);
 
-						if (emailResponse.status === 200) {
-							// Email is valid, proceed to next checks
-						} else {
-							// Email check failed, throw error immediately
-							console.log(`Email fraud check failed for email: ${maskEmail(email)}`);
+						// Fraud check is enabled (FRAUD_CHECK_API_URL is set), so the remote must
+						// explicitly allow this email (HTTP 200). Any other status blocks the
+						// signup (fail-closed): we do not let a signup through unless the fraud
+						// API confirms the email is allowed.
+						if (emailResponse.status !== 200) {
+							console.log(
+								`Email fraud check did not allow email: ${maskEmail(email)} (status ${emailResponse.status})`,
+							);
 							throw new APIError("BAD_REQUEST", {
 								code: "EMAIL_NOT_ALLOWED",
 								message: "The email address is not allowed. Please use a different email address.",
@@ -215,19 +218,23 @@ export const auth = betterAuth({
 						return;
 					} catch (error) {
 						if (error instanceof APIError) {
-							throw error; // Re-throw API validation errors
+							throw error; // Re-throw fraud verdicts
 						}
 
-						// Log network/API errors but don't block signup
-						console.error("Fraud check API error:", error);
+						// Fraud check is enabled but the remote could not be reached (network
+						// error / timeout), so the email was never confirmed as allowed. Fail
+						// closed: block the signup instead of letting it through unverified.
+						console.error("Fraud check API unreachable; blocking signup (fail-closed):", error);
 						Sentry.captureException(error, {
 							tags: { feature: "fraud-check", operation: "api-error" },
 							extra: { email: maskEmail(email) },
 							level: "error",
 						});
 
-						// Allow signup to proceed if fraud check API is down
-						return;
+						throw new APIError("SERVICE_UNAVAILABLE", {
+							code: "FRAUD_CHECK_UNAVAILABLE",
+							message: "We could not verify your registration right now. Please try again later.",
+						});
 					}
 				}
 			}
