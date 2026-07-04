@@ -18,20 +18,9 @@ import {
 	sendVerificationEmail,
 } from "./lib/email";
 import { envWithDefault, requireEnv } from "./lib/env";
-import { maskEmail } from "./lib/redaction";
+import { maskEmail, maskIpAddress } from "./lib/redaction";
 
 const OUTBOUND_REQUEST_TIMEOUT_MS = 5000;
-
-function maskIpAddress(ip: string): string {
-	if (!ip || ip === "unknown") return "unknown";
-	if (ip.includes(":")) {
-		const segments = ip.split(":");
-		return `${segments.slice(0, 2).join(":")}:****`;
-	}
-	const octets = ip.split(".");
-	if (octets.length !== 4) return "[redacted-ip]";
-	return `${octets[0]}.${octets[1]}.x.x`;
-}
 
 function getRequestSignal(): AbortSignal {
 	return AbortSignal.timeout(OUTBOUND_REQUEST_TIMEOUT_MS);

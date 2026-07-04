@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import type { Context, Next } from "hono";
 import { getConnInfo } from "hono/bun";
 import * as ipaddr from "ipaddr.js";
+import { maskIpAddress } from "../lib/redaction";
 
 // ── Environment Variables ──────────────────────────────────────────
 
@@ -226,7 +227,7 @@ export const validateBasicAuth = async (c: Context, next: Next) => {
 	if (isIPWhitelistEnabled) {
 		const clientIP = getClientIP(c);
 		if (!isIPAllowed(clientIP)) {
-			console.warn(`[Security] IP not in whitelist: ${clientIP} not in ${ALLOWED_IPS.join(", ")}`);
+			console.warn(`[Security] IP not in whitelist: ${maskIpAddress(clientIP)}`);
 			return c.json(
 				{
 					success: false,
@@ -294,7 +295,7 @@ export const validateBasicAuth = async (c: Context, next: Next) => {
 		const usernameOk = safeCompare(username, AUTH_USER!);
 		const passwordOk = safeCompare(password, AUTH_PASS!);
 		if (!(usernameOk && passwordOk)) {
-			console.warn(`[Security] Failed login attempt from IP: ${getClientIP(c)}`);
+			console.warn(`[Security] Failed login attempt from IP: ${maskIpAddress(getClientIP(c))}`);
 
 			c.header("WWW-Authenticate", 'Basic realm="API Access"');
 			return c.json(
