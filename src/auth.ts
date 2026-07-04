@@ -446,12 +446,15 @@ export const auth = betterAuth({
 						// and cannot be signed up.
 						disableSignUp: true,
 						async sendVerificationOTP({ email, otp, type }) {
-							sendOtpEmail(email, otp, type).catch((error) => {
+							try {
+								await sendOtpEmail(email, otp, type);
+							} catch (error) {
 								Sentry.captureException(error, {
 									tags: { feature: "auth", operation: "send-otp-email" },
-									extra: { email, type },
+									extra: { email: maskEmail(email), type },
 								});
-							});
+								throw error; // Surface the failure so Better Auth does not report success
+							}
 						},
 					}),
 				]
