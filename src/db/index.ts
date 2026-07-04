@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { parseNumber } from "../config/app.config";
 import { requireEnv } from "../lib/env";
+import * as relations from "./relations";
 import * as schema from "./schema";
 
 const DATABASE_URL = requireEnv("DATABASE_URL");
@@ -39,4 +40,6 @@ pool.on("error", (err) => {
 	});
 });
 
-export const db = drizzle(pool, { schema });
+// Merge the relational definitions into the client schema so Drizzle's
+// relational query API (`db.query.x.findFirst({ with: … })`) can resolve them.
+export const db = drizzle(pool, { schema: { ...schema, ...relations } });
