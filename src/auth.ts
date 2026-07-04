@@ -7,7 +7,7 @@ import * as Sentry from "@sentry/bun";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { emailOTP, jwt, openAPI, twoFactor } from "better-auth/plugins";
-import { and, eq, ilike, inArray, not, or } from "drizzle-orm";
+import { and, eq, ilike, inArray, not, or, sql } from "drizzle-orm";
 import { getAllowedOrigins } from "./config/app.config";
 import { db } from "./db";
 import * as schema from "./db/schema";
@@ -237,7 +237,13 @@ export const auth = betterAuth({
 			}
 		}),
 		after: createAuthMiddleware(async (ctx) => {
-			// Your existing GitHub email fetching logic
+			// Only reconcile GitHub emails on the GitHub OAuth callback (sign-in or
+			// account link). Better-Auth's OAuth callback resolves to /callback/github
+			// and ctx.path is the resolved request path, so without this gate the hook
+			// would query the DB and call the GitHub API on every session creation
+			// (password login, Google, OTP, passkey).
+			if (ctx.path !== "/callback/github") return;
+
 			const newSession = (
 				ctx as {
 					context?: {
@@ -318,74 +324,59 @@ export const auth = betterAuth({
 					});
 				}
 
-				if (filtered.length) {
-					// Insert verified emails
-					try {
-						await db
-							.insert(schema.userEmails)
-							.values(
-								filtered.map((e) => ({
-									userId,
-									email: e.email,
-									primary: Boolean(e.primary),
-									verified: true,
-								})),
-							)
-							.onConflictDoNothing({
-								target: [schema.userEmails.userId, schema.userEmails.email],
-							});
-					} catch (err) {
-						console.error("[hooks.after] Failed to insert verified emails:", err);
-						Sentry.captureException(err, {
-							tags: { feature: "github-auth", operation: "insert-emails" },
-							extra: { userId, emailCount: filtered.length },
-						});
-					}
-
-					// Update flags
-					try {
-						for (const e of filtered) {
-							await db
-								.update(schema.userEmails)
-								.set({
-									primary: Boolean(e.primary),
-									verified: true,
-								})
-								.where(
-									and(eq(schema.userEmails.userId, userId), eq(schema.userEmails.email, e.email)),
-								);
+				// Reconcile in one transaction: upsert the current verified set, then
+				// prune everything else for this user. Runs even when `filtered` is empty
+				// so emails removed or unverified on GitHub get cleaned up.
+				const keepEmails = filtered.map((e) => e.email);
+				try {
+					await db.transaction(async (tx) => {
+						if (filtered.length) {
+							await tx
+								.insert(schema.userEmails)
+								.values(
+									filtered.map((e) => ({
+										userId,
+										email: e.email,
+										primary: e.primary,
+										verified: true,
+									})),
+								)
+								.onConflictDoUpdate({
+									target: [schema.userEmails.userId, schema.userEmails.email],
+									set: {
+										primary: sql`excluded."primary"`,
+										verified: true,
+									},
+								});
 						}
-					} catch (err) {
-						console.error("[hooks.after] Failed to update email flags:", err);
-						Sentry.captureException(err, {
-							tags: { feature: "github-auth", operation: "update-email-flags" },
-							extra: { userId, emailCount: filtered.length },
-						});
-					}
 
-					// Clean up stale records
-					const keepEmails = filtered.map((e) => e.email);
-					try {
-						await db
-							.delete(schema.userEmails)
-							.where(
-								and(
-									eq(schema.userEmails.userId, userId),
-									or(
+						// With a non-empty keep set, prune unverified, noreply, and
+						// no-longer-present rows. With an empty keep set (GitHub returned
+						// none), prune all of the user's rows.
+						const staleCondition =
+							keepEmails.length > 0
+								? or(
 										eq(schema.userEmails.verified, false),
 										ilike(schema.userEmails.email, "%@noreply.github.com"),
 										ilike(schema.userEmails.email, "%@users.noreply.github.com"),
 										not(inArray(schema.userEmails.email, keepEmails)),
-									),
-								),
+									)
+								: undefined;
+
+						await tx
+							.delete(schema.userEmails)
+							.where(
+								staleCondition
+									? and(eq(schema.userEmails.userId, userId), staleCondition)
+									: eq(schema.userEmails.userId, userId),
 							);
-					} catch (err) {
-						console.error("[hooks.after] Failed to clean up unverified/noreply emails:", err);
-						Sentry.captureException(err, {
-							tags: { feature: "github-auth", operation: "cleanup-emails" },
-							extra: { userId, keepEmailsCount: keepEmails.length },
-						});
-					}
+					});
+				} catch (err) {
+					console.error("[hooks.after] Failed to reconcile GitHub emails:", err);
+					Sentry.captureException(err, {
+						tags: { feature: "github-auth", operation: "reconcile-emails" },
+						extra: { userId, emailCount: filtered.length },
+					});
 				}
 			} catch (e) {
 				console.error("[hooks.after] Failed to fetch/log GitHub emails:", e);
