@@ -37,8 +37,9 @@ export const users = pgTable(
 			.notNull(),
 	},
 	(table) => [
+		// A UNIQUE constraint is backed by a unique B-tree index in Postgres,
+		// so it already serves email lookups; no separate index needed.
 		unique("users_email_unique").on(table.email),
-		index("users_email_idx").on(table.email),
 	],
 );
 
@@ -163,8 +164,9 @@ export const verifications = pgTable(
 			.notNull(),
 	},
 	(table) => [
+		// The composite unique's leftmost column (identifier) already serves
+		// identifier-only lookups as a B-tree prefix scan.
 		unique("verifications_identifier_value_unique").on(table.identifier, table.value),
-		index("verifications_identifier_idx").on(table.identifier),
 		index("verifications_expires_at_idx").on(table.expiresAt),
 	],
 );
@@ -197,8 +199,9 @@ export const twoFactors = pgTable(
 			.notNull(),
 	},
 	(table) => [
+		// UNIQUE(user_id) is backed by a unique B-tree index that serves
+		// user_id lookups; no separate index needed.
 		unique("two_factors_user_id_unique").on(table.userId),
-		index("two_factors_user_id_idx").on(table.userId),
 	],
 );
 
@@ -236,9 +239,10 @@ export const passkeys = pgTable(
 		createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
 	},
 	(table) => [
+		// UNIQUE(credential_id) is backed by a unique B-tree index that serves
+		// credential_id lookups; only the user_id index is separately needed.
 		unique("passkeys_credential_id_unique").on(table.credentialID),
 		index("passkeys_user_id_idx").on(table.userId),
-		index("passkeys_credential_id_idx").on(table.credentialID),
 	],
 );
 
