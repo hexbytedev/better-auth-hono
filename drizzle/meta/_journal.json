@@ -15,6 +15,13 @@
       "when": 1783190740189,
       "tag": "0001_amazing_jetstream",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783192058861,
+      "tag": "0002_chunky_anthem",
+      "breakpoints": true
     }
   ]
 }

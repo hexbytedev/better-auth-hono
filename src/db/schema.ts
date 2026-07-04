@@ -284,6 +284,10 @@ export const userEmails = pgTable(
 		primary: boolean("primary").default(false).notNull(),
 		verified: boolean("verified").default(false).notNull(),
 		createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+		updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+			.defaultNow()
+			.$onUpdate(() => new Date())
+			.notNull(),
 	},
 	(table) => [
 		unique("user_emails_unique_per_user").on(table.userId, table.email),
