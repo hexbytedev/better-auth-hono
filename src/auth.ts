@@ -19,6 +19,7 @@ import {
 } from "./lib/email";
 import { envWithDefault, requireEnv } from "./lib/env";
 import { maskEmail, maskIpAddress } from "./lib/redaction";
+import { VERIFIED_CLIENT_IP_HEADER } from "./middleware/api-key.middleware";
 
 const OUTBOUND_REQUEST_TIMEOUT_MS = 5000;
 
@@ -141,22 +142,13 @@ export const auth = betterAuth({
 							});
 						}
 
-						// Step 2: Check IP address
-						// Check headers sequentially for client IP
-						const headers = ["cf-connecting-ip", "x-forwarded-for", "x-real-ip"];
-						let clientIP = "unknown";
-
-						for (const header of headers) {
-							const headerValue = ctx.request?.headers?.get(header);
-							if (headerValue) {
-								// For x-forwarded-for, take the first IP if it contains multiple IPs
-								clientIP =
-									header === "x-forwarded-for"
-										? headerValue.split(",")[0]?.trim()
-										: headerValue.trim();
-								break; // Found IP, stop checking other headers
-							}
-						}
+						// Step 2: Check IP address.
+						// The client IP is resolved once at the Hono layer (getClientIP, which
+						// applies the trusted-proxy model) and injected as a server-set header,
+						// overwriting any client value. We read only that header here so the
+						// fraud check cannot be steered by spoofed forwarded headers.
+						const clientIP =
+							ctx.request?.headers?.get(VERIFIED_CLIENT_IP_HEADER)?.trim() || "unknown";
 
 						console.log(`Checking IP: ${maskIpAddress(clientIP)} for email: ${maskEmail(email)}`);
 

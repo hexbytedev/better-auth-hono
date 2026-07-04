@@ -32,6 +32,12 @@ export const isBasicAuthEnabled = !!(AUTH_USER && AUTH_PASS);
 // Check if IP whitelist is enabled (requires Basic Auth to be enabled)
 export const isIPWhitelistEnabled = isBasicAuthEnabled && ALLOWED_IPS.length > 0;
 
+// Internal header used to carry the server-resolved client IP into the
+// Better-Auth handler. The app sets it (overwriting any client-supplied value)
+// on every /api/auth/* request, so auth hooks read a validated IP rather than
+// spoofable forwarded headers.
+export const VERIFIED_CLIENT_IP_HEADER = "x-verified-client-ip";
+
 // ── IP & CIDR Utilities ────────────────────────────────────────────
 
 type IPAddress = ipaddr.IPv4 | ipaddr.IPv6;

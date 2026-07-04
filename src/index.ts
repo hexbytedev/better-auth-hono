@@ -29,7 +29,11 @@ import { cors } from "hono/cors";
 import { auth } from "./auth";
 import { getAllowedOrigins, getAppHost, getAppPort } from "./config/app.config";
 import { checkEnv } from "./lib/env";
-import { isBasicAuthEnabled } from "./middleware/api-key.middleware";
+import {
+	getClientIP,
+	isBasicAuthEnabled,
+	VERIFIED_CLIENT_IP_HEADER,
+} from "./middleware/api-key.middleware";
 import usersRoute from "./routes/users.route";
 
 // Validate all required environment variables before starting the server
@@ -76,7 +80,13 @@ app.use(
 
 // --- Mount Better Auth ---
 app.on(["POST", "GET"], "/api/auth/*", (c) => {
-	return auth.handler(c.req.raw);
+	// Resolve the real client IP with the trusted-proxy model and inject it as a
+	// server-set header, overwriting any client-supplied value, so auth hooks
+	// (e.g. fraud screening) read a validated IP instead of spoofable headers.
+	const headers = new Headers(c.req.raw.headers);
+	headers.set(VERIFIED_CLIENT_IP_HEADER, getClientIP(c));
+	const req = new Request(c.req.raw, { headers });
+	return auth.handler(req);
 });
 
 // --- User routes (conditionally mounted) ---
