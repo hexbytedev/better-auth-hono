@@ -71,8 +71,6 @@ async function findUser(
 				image: users.image,
 				emailVerified: users.emailVerified,
 				twoFactorEnabled: users.twoFactorEnabled,
-				createdAt: users.createdAt,
-				updatedAt: users.updatedAt,
 			})
 			.from(users)
 			.where(where)
