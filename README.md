@@ -13,7 +13,7 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 - Runtime and migration Docker images, runnable on any container platform (see `Dockerfile` and `docker-compose.yml`).
 - Drizzle ORM schema with UUID primary keys and indices optimized for fast lookups (see `src/db/schema.ts`).
 - JWT support for microservices (`src/auth.ts`) and an internal Basic-Auth protected user lookup API (`GET /api/users/id/:id`, `POST /api/users/email`).
-- Email OTP authentication: sign-in, email verification, password reset, and email change via one-time codes.
+- Email OTP authentication: sign-in, email verification, and password reset via one-time codes.
 - Sign up fraud protection: when `FRAUD_CHECK_API_URL` is configured, each registration's email must be explicitly allowed by the [DeGhost fraud detection API](https://deghost.hexbyte.dev) (API endpoint: <https://deghostapi.hexbyte.dev>) or the signup is blocked (fail-closed); the client IP is additionally screened for disposable/abusive sources and threat signals.
 
 ## Features at a Glance
@@ -45,12 +45,49 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 | **Two-Factor (2FA)** | `better-auth/plugins` | Always |
 | **JWT** | `better-auth/plugins` | Always |
 
-## Deployment to the production cloud
+## Deploy with Docker
 
-- Copy `.env.sample` to `.env.local` and fill in secrets.
-- Docker compose: use the provided `docker-compose.yml` as a starting point.
-- `ghcr.io/hexbytedev/better-auth-hono-migrate:<version>` is required only for running migrations.
-- `ghcr.io/hexbytedev/better-auth-hono:<version>` is the lightweight main app image without any dev dependencies.
+Two prebuilt images do the work: a one-shot **migration** image that applies the schema, and the **runtime** image that serves the app.
+
+- `ghcr.io/hexbytedev/better-auth-hono-migrate:<version>` runs the Drizzle migrations, then exits. Run it once per deploy/upgrade.
+- `ghcr.io/hexbytedev/better-auth-hono:<version>` is the lightweight runtime image (no dev dependencies).
+
+### 1. Provision dependencies
+
+- A **PostgreSQL** database (its connection string becomes `DATABASE_URL`).
+- A **Resend** account with a verified sender domain (for transactional email).
+
+### 2. Configure the environment
+
+Copy `.env.sample` to `.env.local` and fill it in. Every variable is documented inline in `.env.sample`, and the server validates them at boot.
+It **fails fast and lists everything missing** if a required variable is absent, so a bad config never starts silently.
+
+Required in every deployment:
+
+| Variable | Purpose |
+| :--- | :--- |
+| `BETTER_AUTH_SERVER_URL` | Public base URL of this auth server (OAuth callbacks, JWT issuer). |
+| `BETTER_AUTH_SECRET` | Signing/encryption secret generated with `openssl rand -base64 32`. |
+| `BETTER_AUTH_RP_ID` | WebAuthn relying-party ID: domain without scheme (e.g. `auth.example.com`, or `localhost` in dev). |
+| `BETTER_AUTH_RP_NAME` | Human-readable app name shown in passkey prompts. |
+| `CLIENT_URL` | Frontend URL used as a CORS origin and the JWT audience. |
+| `DATABASE_URL` | PostgreSQL connection string. |
+| `RESEND_API_KEY` | Resend API key for sending email. |
+| `EMAIL_FROM` | Verified "from" address for outgoing email. |
+| `COMPANY_NAME` | Name shown in email templates. |
+
+Everything else like social providers, email OTP, fraud checks, Sentry, cookie/CORS tuning etc. are **optional**
+and activates only when its env vars are present.
+
+### 3. Migrate, then start
+
+With the provided `docker-compose.yml` the ordering is handled for you: the migrate service runs to completion (`service_completed_successfully`) before the app starts. Update the image tags to the version you want, then:
+
+```bash
+docker compose up
+```
+
+Once running, `GET /api/health` returns `{ "status": "ok", ... }` for load-balancer / container health checks, and `/api/auth/reference` serves the interactive OpenAPI docs.
 
 ## For developers
 
@@ -107,8 +144,8 @@ GitHub pull requests also run:
 - Fail-fast env validation prevents accidental misconfiguration.
 - Sentry captures structured errors with tags for faster triage.
 - Sign up fraud screening runs only when `FRAUD_CHECK_API_URL` is set (the [DeGhost fraud detection API](https://deghost.hexbyte.dev), endpoint <https://deghostapi.hexbyte.dev>). It is **fail-closed on the email**: the remote must explicitly allow the email (HTTP 200) or the signup is blocked, including when the API is unreachable or returns an error. The client IP is a secondary signal (proxy/VPN and threat checks) that blocks only on an explicit threat verdict.
-- Fraud screening covers only the email/password signup (`/sign-up/email`); social (Google/GitHub) signup is intentionally unscreened because the OAuth provider is responsible for handling fraudulent/abusive accounts.
-- Email OTP is opt-in (`EMAIL_OTP_ENABLED=true`) and sign-in only (`disableSignUp`, so it cannot create accounts), with configurable expiry and hashed OTP storage.
+- Fraud screening covers the self-serve account-creation paths, email/password signup (`/sign-up/email`) and email OTP sign-in (`/sign-in/email-otp`, which creates an account when the user does not yet exist). Social (Google/GitHub) signup is intentionally unscreened because the OAuth provider is responsible for handling fraudulent/abusive accounts.
+- Email OTP is opt-in (`EMAIL_OTP_ENABLED=true`) with configurable expiry (`OTP_EXPIRATION_SECONDS`) and hashed OTP storage. Signing in with an OTP creates the account if it does not already exist, so it is fraud-screened just like email/password signup.
 - Basic Auth middleware protects internal endpoints and uses timing-safe comparisons.
 - `/api/users/*` routes are mounted only when both `API_AUTH_USER` and `API_AUTH_PASSWORD` are configured.
 
@@ -147,7 +184,6 @@ set_real_ip_from 2a06:98c0::/29;
 set_real_ip_from 2c0f:f248::/32;
 
 real_ip_header CF-Connecting-IP;   # $remote_addr becomes the true visitor IP
-
 
 # server block for Cloudflare → nginx → app
 # /etc/nginx/conf.d/better-auth-hono.conf
