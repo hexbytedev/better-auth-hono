@@ -2,6 +2,7 @@ import {
 	bigint,
 	boolean,
 	index,
+	integer,
 	pgTable,
 	text,
 	timestamp,
@@ -191,6 +192,13 @@ export const twoFactors = pgTable(
 		// Backup codes (stored as JSON string array)
 		backupCodes: text("backup_codes").notNull(),
 
+		// Whether the user has verified/activated 2FA
+		verified: boolean("verified").notNull().default(false),
+
+		// Account lockout: consecutive failed second-factor verifications
+		failedVerificationCount: integer("failed_verification_count").notNull().default(0),
+		lockedUntil: timestamp("locked_until", { mode: "date", withTimezone: true }),
+
 		// Timestamps
 		createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
 		updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
@@ -261,8 +269,9 @@ export const jwks = pgTable(
 		publicKey: text("public_key").notNull(),
 		privateKey: text("private_key").notNull(),
 
-		// Timestamp
+		// Timestamps
 		createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+		expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }),
 	},
 	(table) => [index("jwks_created_at_idx").on(table.createdAt)],
 );

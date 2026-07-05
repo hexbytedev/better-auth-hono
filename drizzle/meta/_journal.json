@@ -22,6 +22,27 @@
       "when": 1783192058861,
       "tag": "0002_chunky_anthem",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783281163688,
+      "tag": "0003_numerous_vargas",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783281373490,
+      "tag": "0004_cold_kulan_gath",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783283950815,
+      "tag": "0005_strong_maggott",
+      "breakpoints": true
     }
   ]
 }
