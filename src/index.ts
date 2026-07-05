@@ -149,6 +149,10 @@ app.get("/", (c) => {
 	if (isBasicAuthEnabled) {
 		links.push(
 			{
+				text: "Internal User API Documentation",
+				href: new URL("/api/users/reference", baseUrl).href,
+			},
+			{
 				text: "User API - Get by ID (Requires Basic Auth)",
 				href: new URL("/api/users/id/:id", baseUrl).href,
 			},
