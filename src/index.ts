@@ -8,7 +8,7 @@ import * as Sentry from "@sentry/bun";
 
 const SENTRY_DSN = process.env.SENTRY_DSN?.trim();
 const SENTRY_TRACES_SAMPLE_RATE = process.env.SENTRY_TRACES_SAMPLE_RATE?.trim();
-const SENTRY_SEND_DEFAULT_PII = process.env.SENTRY_SEND_DEFAULT_PII?.trim();
+const SENTRY_SEND_DEFAULT_PII = process.env.SENTRY_SEND_DEFAULT_PII?.trim().toLowerCase();
 
 // Validate the traces sample rate: it must be a finite number in [0, 1]. A
 // malformed (NaN) or out-of-range value is dropped so it does not silently

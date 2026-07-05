@@ -43,13 +43,22 @@ const JWT_EXPIRATION_TIME = envWithDefault("JWT_EXPIRATION_TIME", "1h");
 // Optional: Fraud check API URL
 const FRAUD_CHECK_API_URL = process.env.FRAUD_CHECK_API_URL?.trim();
 
-// Cross-subdomain and cookie configuration
-const CROSS_SUBDOMAIN_COOKIES_ENABLED = process.env.CROSS_SUBDOMAIN_COOKIES_ENABLED?.trim();
+// Optional: block sign-ups from public/free email providers (gmail.com, etc.)
+// using the fraud API's `public_domain` verdict. Requires FRAUD_CHECK_API_URL;
+// OAuth sign-ups are unaffected (this hook does not run for social providers).
+const BLOCK_PUBLIC_DOMAIN_SIGNUP =
+	process.env.BLOCK_PUBLIC_DOMAIN_SIGNUP?.trim().toLowerCase() === "true";
+
+// Cross-subdomain and cookie configuration. Boolean-valued vars are lowercased at
+// read so `=== "true"` comparisons accept TRUE/True/etc. (COOKIE_SAME_SITE is an
+// enum, normalized separately below; the DOMAIN is a plain string).
+const CROSS_SUBDOMAIN_COOKIES_ENABLED =
+	process.env.CROSS_SUBDOMAIN_COOKIES_ENABLED?.trim().toLowerCase();
 const CROSS_SUBDOMAIN_COOKIES_DOMAIN = process.env.CROSS_SUBDOMAIN_COOKIES_DOMAIN?.trim();
 const COOKIE_SAME_SITE = process.env.COOKIE_SAME_SITE?.trim();
-const COOKIE_SECURE = process.env.COOKIE_SECURE?.trim();
-const COOKIE_HTTP_ONLY = process.env.COOKIE_HTTP_ONLY?.trim();
-const COOKIE_PARTITIONED = process.env.COOKIE_PARTITIONED?.trim();
+const COOKIE_SECURE = process.env.COOKIE_SECURE?.trim().toLowerCase();
+const COOKIE_HTTP_ONLY = process.env.COOKIE_HTTP_ONLY?.trim().toLowerCase();
+const COOKIE_PARTITIONED = process.env.COOKIE_PARTITIONED?.trim().toLowerCase();
 
 // Normalize SameSite to a valid lowercase value; anything else is left unset so
 // Better-Auth's own default applies instead of an invalid cast.
@@ -81,10 +90,10 @@ const isGithubEnabled = Boolean(GITHUB_CLIENT_ID && GITHUB_CLIENT_SECRET);
 const APP_SCHEME = process.env.APP_SCHEME?.trim();
 
 // Check if email/password authentication should be enabled (Defaults to true unless explicitly "false")
-const EMAIL_PASSWORD_ENABLED = process.env.EMAIL_PASSWORD_ENABLED?.trim() !== "false";
+const EMAIL_PASSWORD_ENABLED = process.env.EMAIL_PASSWORD_ENABLED?.trim().toLowerCase() !== "false";
 
 // Email OTP feature flag (Defaults to false unless explicitly "true")
-const EMAIL_OTP_ENABLED = process.env.EMAIL_OTP_ENABLED?.trim() === "true";
+const EMAIL_OTP_ENABLED = process.env.EMAIL_OTP_ENABLED?.trim().toLowerCase() === "true";
 
 export const auth = betterAuth({
 	baseURL: SERVER_URL,
@@ -160,6 +169,23 @@ export const auth = betterAuth({
 								code: "EMAIL_NOT_ALLOWED",
 								message: "The email address is not allowed. Please use a different email address.",
 							});
+						}
+
+						// Optional policy: reject public/free email providers (e.g. gmail.com).
+						// The email is already allowed (HTTP 200); this is an extra business rule
+						// driven by the fraud API's `public_domain` verdict. Only read the body
+						// when the flag is on so default behavior is byte-for-byte unchanged. A
+						// malformed body throws and is caught below (fail-closed).
+						if (BLOCK_PUBLIC_DOMAIN_SIGNUP) {
+							const emailData = (await emailResponse.json()) as { public_domain?: boolean };
+							if (emailData?.public_domain === true) {
+								console.log(`Public-domain sign-up blocked for email: ${maskEmail(email)}`);
+								throw new APIError("BAD_REQUEST", {
+									code: "PUBLIC_DOMAIN_NOT_ALLOWED",
+									message:
+										"Registrations from public email providers are not allowed. Please use your organization email address.",
+								});
+							}
 						}
 
 						// Step 2: Check IP address.

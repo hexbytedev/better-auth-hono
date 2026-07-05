@@ -14,7 +14,7 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 - Drizzle ORM schema with UUID primary keys and indices optimized for fast lookups (see `src/db/schema.ts`).
 - JWT support for microservices (`src/auth.ts`) and an internal Basic-Auth protected user lookup API (`GET /api/users/id/:id`, `POST /api/users/email`).
 - Email OTP authentication: sign-in, email verification, and password reset via one-time codes.
-- Sign up fraud protection: when `FRAUD_CHECK_API_URL` is configured, each registration's email must be explicitly allowed by the [DeGhost fraud detection API](https://deghost.hexbyte.dev) (API endpoint: <https://deghostapi.hexbyte.dev>) or the signup is blocked (fail-closed); the client IP is additionally screened for disposable/abusive sources and threat signals.
+- Sign up fraud protection: when `FRAUD_CHECK_API_URL` is configured, each registration's email must be explicitly allowed by the [DeGhost fraud detection API](https://deghost.hexbyte.dev) (API endpoint: <https://deghostapi.hexbyte.dev>) or the signup is blocked (fail-closed); the client IP is additionally screened for disposable/abusive sources and threat signals. Optionally, sign-ups from public/free email providers (gmail.com, etc.) can be rejected via `BLOCK_PUBLIC_DOMAIN_SIGNUP` — handy for B2B apps that only accept organization email.
 
 ## Features at a Glance
 
@@ -27,7 +27,7 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 | **Email OTP** | Sign-in, verification, and password reset via one-time codes | ✅ |
 | **JWT Support** | Stateless tokens for microservice authentication | ✅ |
 | **Internal User API** | **Custom** Basic-Auth protected lookup by ID and email | ✅ |
-| **Signup Protection** | **Custom** Fraud checks for email and IP | ✅ |
+| **Signup Protection** | **Custom** Fraud checks for email, IP, and public-domain policy | ✅ |
 | **OpenAPI/Swagger** | Automated API documentation and reference | ✅ |
 | **Docker Support** | Optimized production-ready container images | ✅ |
 | **Database ORM** | Drizzle with UUID v7 and optimized indexing | ✅ |
@@ -146,6 +146,17 @@ GitHub pull requests also run:
 - Sign up fraud screening runs only when `FRAUD_CHECK_API_URL` is set (the [DeGhost fraud detection API](https://deghost.hexbyte.dev), endpoint <https://deghostapi.hexbyte.dev>). It is **fail-closed on the email**: the remote must explicitly allow the email (HTTP 200) or the signup is blocked, including when the API is unreachable or returns an error. The client IP is a secondary signal (proxy/VPN and threat checks) that blocks only on an explicit threat verdict.
 - Fraud screening covers the self-serve account-creation paths, email/password signup (`/sign-up/email`) and email OTP sign-in (`/sign-in/email-otp`, which creates an account when the user does not yet exist). Social (Google/GitHub) signup is intentionally unscreened because the OAuth provider is responsible for handling fraudulent/abusive accounts.
 - Email OTP is opt-in (`EMAIL_OTP_ENABLED=true`) with configurable expiry (`OTP_EXPIRATION_SECONDS`) and hashed OTP storage. Signing in with an OTP creates the account if it does not already exist, so it is fraud-screened just like email/password signup.
+- Public-domain policy (`BLOCK_PUBLIC_DOMAIN_SIGNUP=true`, requires `FRAUD_CHECK_API_URL`): reject email/OTP sign-ups whose address is a public/free provider, using the fraud API's `public_domain` verdict. The email must first pass the fraud gate (HTTP 200); the domain policy is then applied on top. OAuth (Google/GitHub) sign-ups are not affected. Default is off (public domains allowed).
+
+  The sign-up hook rejects a request with one of these codes (Better-Auth returns them as JSON `{ code, message }`). These are **not** in the auto-generated `/api/auth/reference`, which only reflects Better-Auth's own endpoint schema, not custom hook logic:
+
+  | HTTP | `code` | Trigger |
+  | :--- | :--- | :--- |
+  | 400 | `EMAIL_NOT_ALLOWED` | Fraud API did not allow the email (any non-200 → fail-closed). |
+  | 400 | `PUBLIC_DOMAIN_NOT_ALLOWED` | `BLOCK_PUBLIC_DOMAIN_SIGNUP=true` and the email is a public/free-provider domain. |
+  | 403 | `IP_NOT_ALLOWED` | Client IP returned an explicit threat verdict. |
+  | 503 | `FRAUD_CHECK_UNAVAILABLE` | Fraud API unreachable or errored (fail-closed). |
+
 - Basic Auth middleware protects internal endpoints and uses timing-safe comparisons.
 - `/api/users/*` routes are mounted only when both `API_AUTH_USER` and `API_AUTH_PASSWORD` are configured. When enabled, `/api/users/reference` serves an interactive Scalar reference for the internal API, generated from the same Zod schemas that validate the requests (so the docs cannot drift from the actual contract).
 
