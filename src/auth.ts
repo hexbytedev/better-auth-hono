@@ -506,7 +506,7 @@ export const auth = betterAuth({
 					}),
 				]
 			: []),
-		openAPI(),
+		openAPI({ disableDefaultReference: true }),
 		passkey({
 			schema: {
 				passkey: {
