@@ -50,6 +50,13 @@
       "when": 1783616102625,
       "tag": "0006_groovy_wind_dancer",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1783618318269,
+      "tag": "0007_wealthy_goblin_queen",
+      "breakpoints": true
     }
   ]
 }

@@ -309,7 +309,9 @@ export const userEmails = pgTable(
 // RATE LIMIT TABLE - Better Auth rate limiting
 // ============================================
 export const rateLimit = pgTable("rate_limit", {
-	id: text("id").primaryKey(),
+	id: uuid("id")
+		.primaryKey()
+		.$defaultFn(() => uuidv7()),
 	key: text("key").notNull().unique(),
 	count: integer("count").notNull(),
 	lastRequest: bigint("last_request", { mode: "number" }).notNull(),

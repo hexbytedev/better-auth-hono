@@ -1,0 +1,1 @@
+ALTER TABLE "rate_limit" ALTER COLUMN "id" SET DATA TYPE uuid;
