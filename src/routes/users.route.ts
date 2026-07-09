@@ -230,7 +230,7 @@ usersRoute.doc31("/openapi.json", () => ({
 	openapi: "3.1.0",
 	info: {
 		title: "Internal User API",
-		version: "0.0.9",
+		version: "0.0.10",
 		description:
 			"Server-to-server user lookup API, protected by HTTP Basic Auth. Mounted only when API_AUTH_USER and API_AUTH_PASSWORD are configured; otherwise every /api/users/* path returns 503.",
 	},

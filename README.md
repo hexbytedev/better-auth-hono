@@ -1,5 +1,8 @@
 # Better-Auth Hono - Production-ready Auth Server
 
+> [!TIP]
+> **Live demo — no deployment required.** Try the full login process at **[authtry.hexbyte.dev](https://authtry.hexbyte.dev)**.
+
 This repository packages Better-Auth into a focused, deployable Docker image that delivers a complete authentication service (passkeys, TOTP, JWTs, social OAuth, email/password, email OTP, and an internal lookup API) with pragmatic operational defaults applied.
 
 ## Why this project
