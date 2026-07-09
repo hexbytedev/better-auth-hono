@@ -1,6 +1,5 @@
 // src/routes/users.route.ts
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
-import { Scalar } from "@scalar/hono-api-reference";
 import * as Sentry from "@sentry/bun";
 import { requireEnv } from "../lib/env";
 import { maskEmail } from "../lib/redaction";
@@ -225,7 +224,7 @@ usersRoute.openapi(lookupByIdRoute, async (c) => {
 	}
 });
 
-// ── OpenAPI document + Scalar reference (public; only mounted when the API is) ─
+// ── OpenAPI document (consumed by unified /api/docs Scalar) ────────────────
 
 usersRoute.doc31("/openapi.json", () => ({
 	openapi: "3.1.0",
@@ -237,14 +236,5 @@ usersRoute.doc31("/openapi.json", () => ({
 	},
 	servers: [{ url: `${SERVER_URL}/api/users`, description: "This auth server" }],
 }));
-
-usersRoute.get(
-	"/reference",
-	Scalar({
-		url: "/api/users/openapi.json",
-		pageTitle: "Internal User API — Reference",
-		theme: "default",
-	}),
-);
 
 export default usersRoute;

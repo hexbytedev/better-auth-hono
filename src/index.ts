@@ -43,6 +43,7 @@ if (SENTRY_DSN) {
 }
 
 // Now import everything else
+import { Scalar } from "@scalar/hono-api-reference";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { auth } from "./auth";
@@ -134,34 +135,31 @@ app.get("/api/health", (c) => {
 	});
 });
 
+// --- Unified API Docs (Better Auth + Internal User API) ---
+app.get(
+	"/api/docs",
+	Scalar({
+		pageTitle: "API Reference",
+		theme: "deepSpace",
+		sources: [
+			{ url: "/api/auth/open-api/generate-schema", title: "Auth" },
+			...(isBasicAuthEnabled
+				? [{ url: "/api/users/openapi.json", title: "Internal User API" }]
+				: []),
+		],
+	}),
+);
+
 // --- Root Endpoint ---
 app.get("/", (c) => {
 	const baseUrl = c.req.url;
 
 	const links = [
 		{
-			text: "Go to the Authentication API Documentation",
-			href: new URL("/api/auth/reference", baseUrl).href,
+			text: "API Documentation",
+			href: new URL("/api/docs", baseUrl).href,
 		},
 	];
-
-	// Only show user API links if Basic Auth is enabled
-	if (isBasicAuthEnabled) {
-		links.push(
-			{
-				text: "Internal User API Documentation",
-				href: new URL("/api/users/reference", baseUrl).href,
-			},
-			{
-				text: "User API - Get by ID (Requires Basic Auth)",
-				href: new URL("/api/users/id/:id", baseUrl).href,
-			},
-			{
-				text: "User API - Get by Email (POST, Requires Basic Auth)",
-				href: new URL("/api/users/email", baseUrl).href,
-			},
-		);
-	}
 
 	return c.json({
 		message: "Hello Hono x Better Auth!",
