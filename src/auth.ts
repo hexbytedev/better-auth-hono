@@ -86,6 +86,11 @@ const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID?.trim();
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET?.trim();
 const isGithubEnabled = Boolean(GITHUB_CLIENT_ID && GITHUB_CLIENT_SECRET);
 
+// Allow account linking with different email addresses (e.g., GitHub email differs from signup email).
+// Defaults to false (Better Auth's default: requires matching emails for security).
+const ACCOUNT_LINKING_ALLOW_DIFFERENT_EMAILS =
+	process.env.ACCOUNT_LINKING_ALLOW_DIFFERENT_EMAILS?.trim().toLowerCase() === "true";
+
 // Expo app scheme for deep-link trusted origins
 const APP_SCHEME = process.env.APP_SCHEME?.trim();
 
@@ -625,6 +630,9 @@ export const auth = betterAuth({
 	},
 	account: {
 		modelName: "accounts",
+		accountLinking: {
+			allowDifferentEmails: ACCOUNT_LINKING_ALLOW_DIFFERENT_EMAILS,
+		},
 	},
 	verification: {
 		modelName: "verifications",
