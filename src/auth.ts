@@ -2,7 +2,7 @@
 
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { expo } from "@better-auth/expo";
-import { passkey } from "@better-auth/passkey";
+import { getAuthenticatorName, passkey } from "@better-auth/passkey";
 import * as Sentry from "@sentry/bun";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
@@ -39,6 +39,7 @@ const BETTER_AUTH_RP_ID = requireEnv("BETTER_AUTH_RP_ID");
 const BETTER_AUTH_RP_NAME = requireEnv("BETTER_AUTH_RP_NAME");
 const CLIENT_URL = requireEnv("CLIENT_URL");
 const JWT_EXPIRATION_TIME = envWithDefault("JWT_EXPIRATION_TIME", "1h");
+const TOTP_ISSUER_NAME = envWithDefault("TOTP_ISSUER_NAME", "Hexbyte");
 
 // Optional: Fraud check API URL
 const FRAUD_CHECK_API_URL = process.env.FRAUD_CHECK_API_URL?.trim();
@@ -520,8 +521,14 @@ export const auth = betterAuth({
 				residentKey: "preferred",
 				userVerification: "preferred",
 			},
+			registration: {
+				afterVerification: async ({ verification }) => ({
+					name: getAuthenticatorName(verification.registrationInfo?.aaguid),
+				}),
+			},
 		}),
 		twoFactor({
+			issuer: TOTP_ISSUER_NAME,
 			schema: {
 				twoFactor: {
 					modelName: "twoFactors",
