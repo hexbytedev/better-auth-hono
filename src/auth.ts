@@ -565,6 +565,17 @@ export const auth = betterAuth({
 		}),
 	],
 	advanced: {
+		// Rate limiting / session IP tracking read the client IP from this header.
+		// The Hono layer already resolves the real client IP with the trusted-proxy
+		// model (getClientIP) and injects it as VERIFIED_CLIENT_IP_HEADER on every
+		// /api/auth/* request (see index.ts), overwriting any client-supplied value.
+		// Pointing Better-Auth at that single validated IP keeps its rate-limit buckets
+		// per-client and consistent with fraud-check / login-attempt logging, instead
+		// of falling back to one shared bucket. We do NOT list x-forwarded-for here:
+		// interpreting the forwarded chain is already handled (more strictly) upstream.
+		ipAddress: {
+			ipAddressHeaders: [VERIFIED_CLIENT_IP_HEADER],
+		},
 		crossSubDomainCookies: {
 			enabled: CROSS_SUBDOMAIN_COOKIES_ENABLED === "true",
 			domain: CROSS_SUBDOMAIN_COOKIES_DOMAIN,

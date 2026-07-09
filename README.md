@@ -68,7 +68,7 @@ Required in every deployment:
 | :--- | :--- |
 | `BETTER_AUTH_SERVER_URL` | Public base URL of this auth server (OAuth callbacks, JWT issuer). |
 | `BETTER_AUTH_SECRET` | Signing/encryption secret generated with `openssl rand -base64 32`. |
-| `BETTER_AUTH_RP_ID` | WebAuthn relying-party ID: domain without scheme (e.g. `auth.example.com`, or `localhost` in dev). |
+| `BETTER_AUTH_RP_ID` | WebAuthn relying-party ID: domain without scheme (e.g. `client-frontend.example.com`, or `localhost` in dev). |
 | `BETTER_AUTH_RP_NAME` | Human-readable app name shown in passkey prompts. |
 | `CLIENT_URL` | Frontend URL used as a CORS origin and the JWT audience. |
 | `DATABASE_URL` | PostgreSQL connection string. |
