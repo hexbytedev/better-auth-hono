@@ -101,6 +101,11 @@ const EMAIL_PASSWORD_ENABLED = process.env.EMAIL_PASSWORD_ENABLED?.trim().toLowe
 // Email OTP feature flag (Defaults to false unless explicitly "true")
 const EMAIL_OTP_ENABLED = process.env.EMAIL_OTP_ENABLED?.trim().toLowerCase() === "true";
 
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW = Number.parseInt(process.env.RATE_LIMIT_WINDOW?.trim() || "60", 10);
+const RATE_LIMIT_MAX = Number.parseInt(process.env.RATE_LIMIT_MAX?.trim() || "100", 10);
+const RATE_LIMIT_ENABLED = process.env.RATE_LIMIT_ENABLED?.trim().toLowerCase() !== "false";
+
 export const auth = betterAuth({
 	baseURL: SERVER_URL,
 	trustedOrigins: [
@@ -113,6 +118,14 @@ export const auth = betterAuth({
 			: []),
 	],
 	secret: BETTER_AUTH_SECRET,
+
+	// Rate limiting: enabled by default in production, disabled in development
+	rateLimit: {
+		enabled: RATE_LIMIT_ENABLED,
+		window: RATE_LIMIT_WINDOW,
+		max: RATE_LIMIT_MAX,
+		storage: "database",
+	},
 
 	// Conditionally add Social Providers
 	socialProviders: {
@@ -655,6 +668,7 @@ export const auth = betterAuth({
 			twoFactors: schema.twoFactors,
 			passkeys: schema.passkeys,
 			jwks: schema.jwks,
+			rateLimit: schema.rateLimit,
 		},
 	}),
 });
