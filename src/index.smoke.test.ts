@@ -145,7 +145,7 @@ describe("application smoke tests", () => {
 
 		const body = (await response.json()) as RootResponse;
 		expect(body.basicAuth).toBe("disabled");
-		expect(body.links.some((link) => link.href.endsWith("/api/auth/reference"))).toBe(true);
+		expect(body.links.some((link) => link.href.endsWith("/api/docs"))).toBe(true);
 	});
 
 	test("user API returns 503 when basic auth is not configured", async () => {
@@ -157,8 +157,8 @@ describe("application smoke tests", () => {
 		expect(body.error).toBe("Service Unavailable");
 	});
 
-	test("better-auth reference endpoint is mounted", async () => {
-		const response = await request("/api/auth/reference");
+	test("unified API docs endpoint is mounted", async () => {
+		const response = await request("/api/docs");
 		expect(response.status).toBeGreaterThanOrEqual(200);
 		expect(response.status).toBeLessThan(400);
 
