@@ -43,6 +43,13 @@
       "when": 1783283950815,
       "tag": "0005_strong_maggott",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783616102625,
+      "tag": "0006_groovy_wind_dancer",
+      "breakpoints": true
     }
   ]
 }
