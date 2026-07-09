@@ -1,13 +1,16 @@
 name: local
 services:
+  # One-shot: applies Drizzle migrations, then exits. Same image as the app,
+  # invoked with the `migrate` command. The app waits for it to complete.
   better-auth-hono-migrate:
-    image: ghcr.io/hexbytedev/better-auth-hono-migrate:0.0.1
+    image: ghcr.io/hexbytedev/better-auth-hono:latest
     container_name: better-auth-hono-migrate
-    restart: no
+    command: ['migrate']
+    restart: 'no'
     env_file:
       - .env.local
   better-auth-hono:
-    image: ghcr.io/hexbytedev/better-auth-hono:0.0.1
+    image: ghcr.io/hexbytedev/better-auth-hono:latest
     container_name: better-auth-hono
     restart: unless-stopped
     env_file:

@@ -43,11 +43,12 @@ relational loads are not active. Don't rely on relations unless you also wire th
 in `.env.local` for these commands.
 
 - `bun run generate` — emits SQL into `drizzle/`.
-- `bun run push` — applies it to the database.
+- `bun run migrate` — applies the committed `drizzle/*.sql` files to the database (non-interactive).
+- `bun run push` — shortcut that diff-syncs the schema straight to the DB (interactive, needs a TTY).
 - `bun run studio` — open Drizzle Studio to inspect.
 
-Review the generated `drizzle/*.sql` before pushing to production. The `better-auth-hono-migrate` Docker
-image runs `bunx drizzle-kit push` as its entrypoint.
+Review the generated `drizzle/*.sql` before applying to production. The `better-auth-hono` Docker image
+runs `bunx drizzle-kit migrate` when started with the `migrate` command (see `docker-entrypoint.sh`).
 
 ## Also consider
 

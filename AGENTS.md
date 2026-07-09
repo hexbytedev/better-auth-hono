@@ -68,7 +68,8 @@ Lint/Format
 DB (Drizzle)
 
 - `bun run generate` (wrapper for `bunx drizzle-kit generate`)
-- `bun run push` (wrapper for `bunx drizzle-kit push`)
+- `bun run migrate` (wrapper for `bunx drizzle-kit migrate`, applies committed `drizzle/*.sql`; used in deploys)
+- `bun run push` (wrapper for `bunx drizzle-kit push`, diff-sync; interactive)
 - `bun run studio` (wrapper for `bunx drizzle-kit studio`, opens Drizzle Studio)
 
 Tests
@@ -80,7 +81,7 @@ Tests
 CI
 
 - GitHub Actions runs CI (on push and pull requests) with `bun run lint:check`, `bun run build`, `bun run test`, and `bun audit --audit-level=high`.
-- A separate workflow builds and pushes Docker images on tag pushes or manual `workflow_dispatch`.
+- A separate workflow builds and pushes the single Docker image (serves the app; runs migrations via the `migrate` command) on tag pushes or manual `workflow_dispatch`.
 
 ## Code Style Guidelines
 
@@ -136,7 +137,8 @@ CI
 
 - Schema lives in `src/db/schema.ts`.
 - Prefer typed `select` projections and return safe DTOs.
-- For migrations, edit schema then run drizzle generate/push.
+- For migrations, edit schema then run `bun run generate` to create the SQL and `bun run migrate` to apply it (`push` for diff-sync,
+  interactive only).
 
 ### Better-Auth
 

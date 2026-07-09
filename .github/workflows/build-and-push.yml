@@ -56,15 +56,8 @@ jobs:
               echo "ghcr.io/hexbytedev/better-auth-hono:latest"
               echo "EOF"
             } >> "$GITHUB_OUTPUT"
-            {
-              echo "migrate_tags<<EOF"
-              echo "ghcr.io/hexbytedev/better-auth-hono-migrate:$VERSION"
-              echo "ghcr.io/hexbytedev/better-auth-hono-migrate:latest"
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
           else
             echo "tags=" >> "$GITHUB_OUTPUT"
-            echo "migrate_tags=" >> "$GITHUB_OUTPUT"
           fi
 
       - name: 🔍 Show computed image tag
@@ -77,7 +70,7 @@ jobs:
             echo "::warning::No tag detected; build will be skipped."
           fi
 
-      - name: 🚀 Build and push runner image
+      - name: 🚀 Build and push image
         if: ${{ steps.set-tag.outputs.tags != '' }}
         uses: docker/build-push-action@v7
         with:
@@ -87,18 +80,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.set-tag.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: 🛠️ Build and push migration image
-        if: ${{ steps.set-tag.outputs.migrate_tags != '' }}
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ./Dockerfile
-          target: migrate
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.set-tag.outputs.migrate_tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

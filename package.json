@@ -10,6 +10,7 @@
     "lint:check": "biome check src",
     "format": "biome format --write src",
     "generate": "bunx drizzle-kit generate",
+    "migrate": "bunx drizzle-kit migrate",
     "push": "bunx drizzle-kit push",
     "studio": "bunx drizzle-kit studio",
     "prepare": "husky"

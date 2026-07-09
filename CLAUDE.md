@@ -14,7 +14,9 @@ Runtime is **Bun** (not Node). All scripts run through Bun.
 - Lint: `bun run lint` (Biome check + autofix) / `bun run lint:check` (no writes, used in CI)
 - Format: `bun run format`
 - Tests: `bun run test` — single file `bun test src/index.smoke.test.ts` — single name `bun test -t "application smoke tests"`
-- DB migrations: `bun run generate` then `bun run push` (Drizzle). `bun run studio` opens Drizzle Studio.
+- DB migrations: `bun run generate` to create SQL from the schema, then `bun run migrate` to apply the committed `drizzle/*.sql` files
+  (non-interactive; used in deploys). `bun run push` diff-syncs the schema straight to the DB (interactive, needs a TTY).
+  `bun run studio` opens Drizzle Studio.
 
 `drizzle.config.ts` loads `.env.local` directly (not `dotenv/config`), so Drizzle commands need `DATABASE_URL` in `.env.local`. CI (`.github/workflows/ci.yml`) runs `lint:check`, `build`, `test`, and `bun audit --audit-level=high`. A pre-commit Husky hook runs `bun run lint`.
 
@@ -69,4 +71,8 @@ All transactional email goes through Resend. The `Resend` client is constructed 
 
 ## Deployment
 
-Two Docker images: `better-auth-hono` (runtime) and `better-auth-hono-migrate` (migrations only). See `Dockerfile`, `docker-compose.yml`, and the `build-and-push.yml` workflow (builds on tag push / manual dispatch). Do not hand-edit `dist/`.
+A single Docker image `better-auth-hono` serves the app and runs migrations. `docker-entrypoint.sh` dispatches on the container command:
+default/`app` starts the server, `migrate` applies the committed `drizzle/*.sql` files, `push` diff-syncs the schema. The `runner` stage
+builds from `base` so `drizzle-kit` and the `drizzle/` migrations are present. See `Dockerfile`, `docker-compose.yml` (runs the same image
+twice — one `migrate` one-shot the app depends on), and the `build-and-push.yml` workflow (builds on tag push / manual dispatch). Do not
+hand-edit `dist/`.
