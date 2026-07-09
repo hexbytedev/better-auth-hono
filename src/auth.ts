@@ -39,7 +39,7 @@ const BETTER_AUTH_RP_ID = requireEnv("BETTER_AUTH_RP_ID");
 const BETTER_AUTH_RP_NAME = requireEnv("BETTER_AUTH_RP_NAME");
 const CLIENT_URL = requireEnv("CLIENT_URL");
 const JWT_EXPIRATION_TIME = envWithDefault("JWT_EXPIRATION_TIME", "1h");
-const TOTP_ISSUER_NAME = envWithDefault("TOTP_ISSUER_NAME", "Hexbyte");
+const TOTP_ISSUER_NAME = envWithDefault("TOTP_ISSUER_NAME", "hexbyte");
 
 // Optional: Fraud check API URL
 const FRAUD_CHECK_API_URL = process.env.FRAUD_CHECK_API_URL?.trim();
