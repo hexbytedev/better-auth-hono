@@ -37,18 +37,17 @@ Note: `src/db/relations.ts` defines Drizzle relations but is **not** imported in
 (`drizzle(pool, { schema })` only receives `schema.ts`), so `db.query.*.findFirst({ with: ... })`
 relational loads are not active. Don't rely on relations unless you also wire them into `src/db/index.ts`.
 
-## 3. Generate and apply
+## 3. Sync the schema
 
 `drizzle.config.ts` loads `.env.local` directly (not `dotenv/config`), so `DATABASE_URL` must be set
 in `.env.local` for these commands.
 
-- `bun run generate` — emits SQL into `drizzle/`.
-- `bun run migrate` — applies the committed `drizzle/*.sql` files to the database (non-interactive).
-- `bun run push` — shortcut that diff-syncs the schema straight to the DB (interactive, needs a TTY).
+- `bun run push` — syncs the schema straight to the DB, for setup and updates (interactive — prompts on changes it can't apply automatically, needs a TTY).
+- `bun run generate` — optionally emits versioned SQL into `drizzle/` for review/history.
 - `bun run studio` — open Drizzle Studio to inspect.
 
-Review the generated `drizzle/*.sql` before applying to production. The `better-auth-hono` Docker image
-runs `bunx drizzle-kit migrate` when started with the `migrate` command (see `docker-entrypoint.sh`).
+Review the schema change before applying to production. The `better-auth-hono` Docker image runs
+`bunx drizzle-kit push` when started with the `push` command (see `docker-entrypoint.sh`).
 
 ## Also consider
 

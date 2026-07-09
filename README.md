@@ -50,20 +50,19 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 
 ## Deploy with Docker
 
-A single prebuilt image `ghcr.io/hexbytedev/better-auth-hono:<version>` both serves the app and runs database migrations. Choose the mode via the container command:
+A single prebuilt image `ghcr.io/hexbytedev/better-auth-hono:<version>` both serves the app and sets up the database schema. Choose the mode via the container command:
 
 - **no command** (or `app`) → starts the auth server (default).
-- `migrate` → applies the committed Drizzle migrations (`drizzle/*.sql`) and exits. Runs **non-interactively**, so it is safe in CI/containers.
+- `push` → syncs `src/db/schema.ts` into the database, then exits. Run it once per deploy/upgrade (the compose file does this for you).
 
-To apply migrations as a one-shot job:
+To set up (or update) the schema as a one-shot job:
 
 ```bash
-docker run --rm --env-file .env.local ghcr.io/hexbytedev/better-auth-hono:<version> migrate
+docker run --rm --env-file .env.local ghcr.io/hexbytedev/better-auth-hono:<version> push
 ```
 
-**Diff-sync the schema with `push` (interactive).** `push` diff-syncs `src/db/schema.ts` straight to the database without going through migration files.
-It is a **dev/manual** tool: it **prompts before risky changes**, so it needs an interactive TTY and **cannot run as an unattended container command**.
-Run it from inside a running container instead:
+On a new/empty database this applies the whole schema and exits cleanly. When `push` meets a change it will not apply automatically
+(e.g. a destructive change against existing data) it **prompts for confirmation**, which needs an interactive terminal. Run it from inside a running container instead:
 
 ```bash
 # open a shell in the running app container (its name from docker-compose.yml is better-auth-hono)
@@ -102,9 +101,9 @@ Required in every deployment:
 Everything else like social providers, email OTP, fraud checks, Sentry, cookie/CORS tuning etc. are **optional**
 and activates only when its env vars are present.
 
-### 3. Migrate, then start
+### 3. Set up the schema, then start
 
-With the provided `docker-compose.yml` the ordering is handled for you: the migrate service (the same image invoked with the `migrate` command)
+With the provided `docker-compose.yml` the ordering is handled for you: the schema-setup service (the same image invoked with the `push` command)
 runs to completion (`service_completed_successfully`) before the app starts. Update the image tags to the version you want, then:
 
 ```bash
@@ -136,12 +135,12 @@ and when the internal user API is enabled, it adds the Basic-Auth lookup API as 
 
 Scripts are run with **Bun** (this repo has no `yarn`/`db:*` scripts):
 
-- `bun run generate`: after editing `src/db/schema.ts`, emit versioned SQL into `drizzle/`. **Commit those files.** This is the developer-side step; it is not run in the container.
-- `bun run migrate`: apply the committed `drizzle/*.sql` to the database (what the Docker image runs with the `migrate` command).
-- `bun run push`: diff-sync the schema straight to the DB without migration files. Interactive (prompts on risky changes); handy for local iteration. Does **not** need `generate`.
+- `bun run push`: syncs `src/db/schema.ts` straight into the database. This is how the schema is set up and updated (including on a fresh database).
+  It prompts before a change it will not apply automatically (e.g. one that risks existing data), so it needs a TTY.
+- `bun run generate`: optionally record the change as versioned SQL in `drizzle/` for review/history.
 - `drizzle.config.ts` loads `.env.local`, so Drizzle commands use that file for `DATABASE_URL`.
 
-Typical schema change: edit `src/db/schema.ts` → `bun run generate` → review the new `drizzle/*.sql` → `bun run migrate` or `bun run push` (interactive).
+Typical schema change: edit `src/db/schema.ts` → `bun run generate` → `bun run push` (answer any prompts).
 
 ### Code quality
 

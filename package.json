@@ -1,6 +1,6 @@
 {
   "name": "hono-better-auth",
-  "version": "0.0.10",
+  "version": "0.0.12",
   "scripts": {
     "dev": "bun run --hot src/index.ts",
     "start": "bun run dist/index.js",
