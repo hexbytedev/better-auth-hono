@@ -240,7 +240,11 @@ usersRoute.doc31("/openapi.json", () => ({
 
 usersRoute.get(
 	"/reference",
-	Scalar({ url: "/api/users/openapi.json", pageTitle: "Internal User API — Reference" }),
+	Scalar({
+		url: "/api/users/openapi.json",
+		pageTitle: "Internal User API — Reference",
+		theme: "default",
+	}),
 );
 
 export default usersRoute;
