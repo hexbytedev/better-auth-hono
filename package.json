@@ -16,7 +16,7 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@better-auth/drizzle-adapter": "^1.6.23",
+    "@better-auth/drizzle-adapter": "^1.6.29",
     "@better-auth/expo": "^1.6.23",
     "@better-auth/passkey": "^1.6.23",
     "@hono/zod-openapi": "^1.4.0",
