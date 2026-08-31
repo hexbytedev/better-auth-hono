@@ -14,7 +14,7 @@
         "better-auth": "^1.6.23",
         "dotenv": "^17.4.2",
         "drizzle-orm": "^0.45.2",
-        "hono": "^4.12.28",
+        "hono": "^4.13.5",
         "ipaddr.js": "^2.4.0",
         "pg": "^8.22.0",
         "resend": "^6.17.2",
@@ -277,7 +277,7 @@
 
     "get-tsconfig": ["get-tsconfig@4.14.0", "", { "dependencies": { "resolve-pkg-maps": "^1.0.0" } }, "sha512-yTb+8DXzDREzgvYmh6s9vHsSVCHeC0G3PI5bEXNBHtmshPnO+S5O7qgLEOn0I5QvMy6kpZN8K1NKGyilLb93wA=="],
 
-    "hono": ["hono@4.12.28", "", {}, "sha512-YwUvVpSF7m1yOblFPrU3Hbo8XhPheBoiyfGuII6z19LnOr6JpDnyyp7LFNrfV56wS8tpvtBFGRISHN02pDdLOA=="],
+    "hono": ["hono@4.13.5", "", {}, "sha512-O6+/eCYRkzzzy0rPWwKLiGBR1nFuUPZynnwjxN1MBA62NNqbT0wQEzQyK2gSO5yDIDB336sXQleAhOHrzlYyKw=="],
 
     "husky": ["husky@9.1.7", "", { "bin": { "husky": "bin.js" } }, "sha512-5gs5ytaNjBrh5Ow3zrvdUUY+0VxIuWVL4i9irt6friV+BqdCfmV11CQTWMiBYWHbXhco+J1kHfTOUkePhCDvMA=="],
 
