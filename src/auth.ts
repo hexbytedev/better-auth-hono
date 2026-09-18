@@ -21,7 +21,7 @@ import {
 	sendPasswordResetEmail,
 	sendVerificationEmail,
 } from "./lib/email";
-import { getEmailVerificationRequestType } from "./lib/email-verification-token";
+import { isChangeEmailVerificationToken } from "./lib/email-verification-token";
 import { envWithDefault, requireEnv } from "./lib/env";
 import { maskEmail, maskIpAddress } from "./lib/redaction";
 import { VERIFIED_CLIENT_IP_HEADER } from "./middleware/api-key.middleware";
@@ -485,21 +485,32 @@ export const auth = betterAuth({
 			sendOnSignIn: false, // Don't send on every sign-in attempt
 			autoSignInAfterVerification: false,
 			async sendVerificationEmail({ user, url, token }) {
+				// Better Auth reuses this callback for signup verification and for
+				// change-email verification (when sendChangeEmailConfirmation is omitted).
+				// Distinguish via the JWT's updateTo claim so change-email copy is not the
+				// signup template. Note: Better Auth's updateEmailWithoutVerification path
+				// creates this token with no updateTo/requestType at all, so it is
+				// indistinguishable from a signup token and always falls through to the
+				// signup copy below — a Better Auth API gap, not something fixable here.
+				const isChangeEmail = isChangeEmailVerificationToken(token);
 				try {
-					// Better Auth reuses this callback for signup verification and for
-					// change-email verification (when sendChangeEmailConfirmation is omitted).
-					// Distinguish via the JWT requestType so change-email copy is not the
-					// signup template.
-					const requestType = getEmailVerificationRequestType(token);
-					if (requestType === "change-email-verification") {
+					if (isChangeEmail) {
 						await sendChangeEmailVerificationEmail(user, url);
 					} else {
 						await sendVerificationEmail(user, url);
 					}
 				} catch (error) {
 					Sentry.captureException(error, {
-						tags: { feature: "auth", operation: "send-verification-email" },
+						tags: {
+							feature: "auth",
+							operation: isChangeEmail
+								? "send-change-email-verification"
+								: "send-verification-email",
+						},
 						user: { id: user.id },
+						extra: isChangeEmail
+							? { urlPath: new URL(url).pathname, newEmail: maskEmail(user.email) }
+							: undefined,
 					});
 					throw error;
 				}
