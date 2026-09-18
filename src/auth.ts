@@ -16,11 +16,12 @@ import {
 import { db } from "./db";
 import * as schema from "./db/schema";
 import {
-	sendChangeEmailConfirmationEmail,
+	sendChangeEmailVerificationEmail,
 	sendOtpEmail,
 	sendPasswordResetEmail,
 	sendVerificationEmail,
 } from "./lib/email";
+import { getEmailVerificationRequestType } from "./lib/email-verification-token";
 import { envWithDefault, requireEnv } from "./lib/env";
 import { maskEmail, maskIpAddress } from "./lib/redaction";
 import { VERIFIED_CLIENT_IP_HEADER } from "./middleware/api-key.middleware";
@@ -483,9 +484,18 @@ export const auth = betterAuth({
 			sendOnSignUp: true,
 			sendOnSignIn: false, // Don't send on every sign-in attempt
 			autoSignInAfterVerification: false,
-			async sendVerificationEmail({ user, url }) {
+			async sendVerificationEmail({ user, url, token }) {
 				try {
-					await sendVerificationEmail(user, url);
+					// Better Auth reuses this callback for signup verification and for
+					// change-email verification (when sendChangeEmailConfirmation is omitted).
+					// Distinguish via the JWT requestType so change-email copy is not the
+					// signup template.
+					const requestType = getEmailVerificationRequestType(token);
+					if (requestType === "change-email-verification") {
+						await sendChangeEmailVerificationEmail(user, url);
+					} else {
+						await sendVerificationEmail(user, url);
+					}
 				} catch (error) {
 					Sentry.captureException(error, {
 						tags: { feature: "auth", operation: "send-verification-email" },
@@ -623,24 +633,12 @@ export const auth = betterAuth({
 	user: {
 		modelName: "users",
 		...(EMAIL_PASSWORD_ENABLED && {
+			// One-email flow (Better Auth default when sendChangeEmailConfirmation is omitted):
+			// verification goes to the *new* address; email updates only after that click.
+			// Skipping current-inbox approval means a stolen session can start a change without
+			// the victim approving from the old inbox — the new inbox must still be reachable.
 			changeEmail: {
 				enabled: true,
-				sendChangeEmailConfirmation: async ({ user, newEmail, url }) => {
-					try {
-						await sendChangeEmailConfirmationEmail(user, newEmail, url);
-					} catch (error) {
-						console.error("Failed to send change email confirmation:", error);
-						Sentry.captureException(error, {
-							tags: { feature: "auth", operation: "send-change-email-confirmation" },
-							user: { id: user.id },
-							extra: {
-								urlPath: new URL(url).pathname,
-								newEmail: maskEmail(newEmail),
-							},
-						});
-						throw error;
-					}
-				},
 			},
 		}),
 	},

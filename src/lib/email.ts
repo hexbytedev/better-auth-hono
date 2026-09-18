@@ -281,30 +281,23 @@ export async function sendOtpEmail(
 }
 
 /**
- * Sends a change email confirmation to the user's current email
- * @param user - User object containing email and optional name
- * @param newEmail - The new email address requested
- * @param confirmationUrl - The URL to approve the email change
- * @returns Promise with the email service response
+ * Sends a verification email to the *new* address during an email change.
+ * Distinct from signup verification so the copy does not mention signing up.
  */
-export async function sendChangeEmailConfirmationEmail(
-	user: User,
-	newEmail: string,
-	confirmationUrl: string,
-) {
-	const subject = "Approve email change";
+export async function sendChangeEmailVerificationEmail(user: User, verificationUrl: string) {
+	const subject = "Confirm your new email address";
 	const safeName = escapeHtml(user.name || "there");
 	const safeCompanyName = escapeHtml(COMPANY_NAME);
-	const safeNewEmail = escapeHtml(newEmail);
-	const safeConfirmationUrl = escapeHtmlAttribute(confirmationUrl);
+	const safeEmail = escapeHtml(user.email);
+	const safeVerificationUrl = escapeHtmlAttribute(verificationUrl);
 
 	const bodyContent = `
 		<p>Hello ${safeName},</p>
-		<p>We received a request to change the email address for your <strong>${safeCompanyName}</strong> account to <strong>${safeNewEmail}</strong>. Please approve this change by clicking the button below.</p>
+		<p>We received a request to use <strong>${safeEmail}</strong> as the email for your <strong>${safeCompanyName}</strong> account. Click the button below to confirm this address and finish the change.</p>
 		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 10px; margin-bottom: 10px;">
 			<tr>
 				<td align="left">
-					<a href="${safeConfirmationUrl}" style="background-color: ${PRIMARY_COLOR}; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid ${PRIMARY_COLOR};">Approve Email Change</a>
+					<a href="${safeVerificationUrl}" style="background-color: ${PRIMARY_COLOR}; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid ${PRIMARY_COLOR};">Confirm New Email</a>
 				</td>
 			</tr>
 		</table>
@@ -312,9 +305,9 @@ export async function sendChangeEmailConfirmationEmail(
 	`;
 
 	const footerContent = `
-		If you didn't request an email change, please ignore this email and your account email will remain unchanged.
+		If you didn't request an email change, you can safely ignore this email. Your account email will remain unchanged.
 	`;
 
 	const html = getEmailTemplate(subject, bodyContent, footerContent);
-	return sendEmail("change-email-confirmation", user.email, subject, html);
+	return sendEmail("change-email-verification", user.email, subject, html);
 }
