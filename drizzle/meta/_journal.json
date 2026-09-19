@@ -57,6 +57,13 @@
       "when": 1783618318269,
       "tag": "0007_wealthy_goblin_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789748694878,
+      "tag": "0008_warm_nitro",
+      "breakpoints": true
     }
   ]
 }

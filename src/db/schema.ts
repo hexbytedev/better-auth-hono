@@ -272,6 +272,10 @@ export const jwks = pgTable(
 		// Timestamps
 		createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
 		expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }),
+
+		// Key algorithm/curve (Better Auth 1.7+, nullable: absent on keys created before the upgrade)
+		alg: text("alg"),
+		crv: text("crv"),
 	},
 	(table) => [index("jwks_created_at_idx").on(table.createdAt)],
 );
