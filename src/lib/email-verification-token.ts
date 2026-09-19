@@ -12,6 +12,7 @@
  */
 export function isChangeEmailVerificationToken(token: string): boolean {
 	try {
+		console.log(token, "Track");
 		const payloadPart = token.split(".")[1];
 		if (!payloadPart) return false;
 		const json = JSON.parse(Buffer.from(payloadPart, "base64url").toString("utf8")) as Record<

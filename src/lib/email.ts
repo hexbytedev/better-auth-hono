@@ -140,14 +140,14 @@ function getEmailTemplate(title: string, bodyContent: string, footerContent: str
 							<tr>
 								<td style="padding: 48px 40px;">
 									<h1 style="margin: 0 0 24px 0; font-size: 24px; font-weight: 600; color: #18181b; letter-spacing: -0.5px;">${title}</h1>
-									
+
 									<div style="font-size: 16px; line-height: 1.6; color: #3f3f46;">
 										${bodyContent}
 									</div>
 								</td>
 							</tr>
 						</table>
-						
+
 						<table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px;">
 							<tr>
 								<td style="padding: 32px 40px; text-align: left; font-size: 13px; line-height: 1.6; color: #71717a;">
@@ -283,6 +283,8 @@ export async function sendOtpEmail(
 /**
  * Sends a verification email to the *new* address during an email change.
  * Distinct from signup verification so the copy does not mention signing up.
+ * `user.email` is the new address here: Better Auth overrides it to `newEmail`
+ * before invoking this step (see update-user.mjs / email-verification.mjs).
  */
 export async function sendChangeEmailVerificationEmail(user: User, verificationUrl: string) {
 	const subject = "Confirm your new email address";
@@ -310,4 +312,44 @@ export async function sendChangeEmailVerificationEmail(user: User, verificationU
 
 	const html = getEmailTemplate(subject, bodyContent, footerContent);
 	return sendEmail("change-email-verification", user.email, subject, html);
+}
+
+/**
+ * Sends a change email confirmation to the user's current email, before the
+ * verification link is sent to the new address.
+ * @param user - User object containing the current email and optional name
+ * @param newEmail - The new email address requested
+ * @param confirmationUrl - The URL to approve the email change
+ * @returns Promise with the email service response
+ */
+export async function sendChangeEmailConfirmationEmail(
+	user: User,
+	newEmail: string,
+	confirmationUrl: string,
+) {
+	const subject = "Approve email change";
+	const safeName = escapeHtml(user.name || "there");
+	const safeCompanyName = escapeHtml(COMPANY_NAME);
+	const safeNewEmail = escapeHtml(newEmail);
+	const safeConfirmationUrl = escapeHtmlAttribute(confirmationUrl);
+
+	const bodyContent = `
+		<p>Hello ${safeName},</p>
+		<p>We received a request to change the email address on your <strong>${safeCompanyName}</strong> account to <strong>${safeNewEmail}</strong>. Click the button below to approve this change from your current inbox.</p>
+		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 10px; margin-bottom: 10px;">
+			<tr>
+				<td align="left">
+					<a href="${safeConfirmationUrl}" style="background-color: ${PRIMARY_COLOR}; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid ${PRIMARY_COLOR};">Approve Email Change</a>
+				</td>
+			</tr>
+		</table>
+		<p style="font-size: 14px; color: #71717a;">This link will expire in ${formatExpirationTime(TOKEN_EXPIRATION_SECONDS)}. After you approve, we'll send a confirmation link to ${safeNewEmail} to finish the change.</p>
+	`;
+
+	const footerContent = `
+		If you didn't request an email change, you can safely ignore this email — and consider reviewing your account's security. Your account email will remain unchanged.
+	`;
+
+	const html = getEmailTemplate(subject, bodyContent, footerContent);
+	return sendEmail("change-email-confirmation", user.email, subject, html);
 }
