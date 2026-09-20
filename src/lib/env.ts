@@ -17,9 +17,9 @@ let checked = false;
  * CONTRACT: because `checkEnv()` runs *after* the modules that call this at
  * module scope have already been imported, the `""` placeholder must be inert.
  * Module-scope consumers of a `requireEnv` value must not trigger side effects
- * on it before `checkEnv()` exits — e.g. no eager network/DB connections, no
+ * on it before `checkEnv()` exits (e.g. no eager network/DB connections, no
  * option validation that throws on `""`, no writing the placeholder anywhere
- * observable. Defer such work behind a lazy getter (see `getResend()` in
+ * observable). Defer such work behind a lazy getter (see `getResend()` in
  * `lib/email.ts`) so it never executes with placeholder config.
  *
  * The accumulate-and-defer path only applies *before* `checkEnv()` runs. A miss

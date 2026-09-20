@@ -1,6 +1,6 @@
 ---
 name: db-migration
-description: Use when changing the database schema — adding or altering a Drizzle table, column, index, or constraint in src/db/schema.ts — and generating/applying the migration. Covers the UUIDv7/timestamp conventions, Better-Auth drizzleAdapter registration, and the generate/push workflow.
+description: Use when changing the database schema (adding or altering a Drizzle table, column, index, or constraint in src/db/schema.ts) and generating/applying the migration. Covers the UUIDv7/timestamp conventions, Better-Auth drizzleAdapter registration, and the generate/push workflow.
 ---
 
 # Database schema change + migration
@@ -12,11 +12,11 @@ Drizzle ORM over a `pg` Pool. All schema lives in `src/db/schema.ts`; the `db` i
 
 Match the existing conventions:
 
-- **Primary key**: `uuid("id").primaryKey().$defaultFn(() => uuidv7())` — IDs come from the schema,
+- **Primary key**: `uuid("id").primaryKey().$defaultFn(() => uuidv7())`; IDs come from the schema,
   not Better-Auth (`advanced.database.generateId: false` in `src/auth.ts`).
 - **Timestamps**: `timestamp(..., { mode: "date", withTimezone: true })` with `.defaultNow().notNull()`,
   and `.$onUpdate(() => new Date())` for `updated_at`.
-- **Constraints/indices**: return an array from the table callback — `unique("name").on(...)` and
+- **Constraints/indices**: return an array from the table callback: `unique("name").on(...)` and
   `index("name").on(...)`. Add indices tuned for how the column is looked up.
 - **Foreign keys**: `.references(() => users.id, { onDelete: "cascade" })`.
 - Add matching `$inferSelect` / `$inferInsert` type exports at the bottom of the file.
@@ -27,10 +27,10 @@ Better-Auth core models (`users`, `sessions`, `accounts`, `verifications`, `twoF
 `jwks`) are wired in two places and BOTH must be kept in sync:
 
 1. The `drizzleAdapter(db, { provider: "pg", schema: { ... } })` map.
-2. The model remap — top-level `user`/`session`/`account`/`verification` `modelName` fields, or a
+2. The model remap: top-level `user`/`session`/`account`/`verification` `modelName` fields, or a
    plugin's `schema: { <model>: { modelName: "..." } }` option (see `passkey`, `twoFactor`, `jwt`).
 
-Custom application tables (e.g. `user_emails`) are **not** registered with Better-Auth — they are used
+Custom application tables (e.g. `user_emails`) are **not** registered with Better-Auth; they are used
 directly via `schema.userEmails` in app code.
 
 Note: `src/db/relations.ts` defines Drizzle relations but is **not** imported into the `db` instance
@@ -42,9 +42,9 @@ relational loads are not active. Don't rely on relations unless you also wire th
 `drizzle.config.ts` loads `.env.local` directly (not `dotenv/config`), so `DATABASE_URL` must be set
 in `.env.local` for these commands.
 
-- `bun run push` — syncs the schema straight to the DB, for setup and updates (interactive — prompts on changes it can't apply automatically, needs a TTY).
-- `bun run generate` — optionally emits versioned SQL into `drizzle/` for review/history.
-- `bun run studio` — open Drizzle Studio to inspect.
+- `bun run push`: syncs the schema straight to the DB, for setup and updates (interactive; it prompts on changes it can't apply automatically, so it needs a TTY).
+- `bun run generate`: optionally emits versioned SQL into `drizzle/` for review/history.
+- `bun run studio`: open Drizzle Studio to inspect.
 
 Review the schema change before applying to production. The `better-auth-hono` Docker image runs
 `bunx drizzle-kit push` when started with the `push` command (see `docker-entrypoint.sh`).
@@ -53,4 +53,4 @@ Review the schema change before applying to production. The `better-auth-hono` D
 
 - New env vars → follow the `add-env-var` skill.
 - If the change exposes user data through the internal API, update the `select` projection and safe DTO
-  in `src/services/user.service.ts` — never widen it to return raw rows.
+  in `src/services/user.service.ts`. Never widen it to return raw rows.

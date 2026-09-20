@@ -3,8 +3,8 @@
 #
 # Usage (pass the mode as the container command):
 #   (default / "app")  start the auth server
-#   migrate            apply committed Drizzle migrations (drizzle/*.sql) — non-interactive, safe for CI/containers
-#   push               push schema directly to the DB — interactive, needs a TTY
+#   migrate            apply committed Drizzle migrations (drizzle/*.sql); non-interactive, safe for CI/containers
+#   push               push schema directly to the DB; interactive, needs a TTY
 #   <anything else>    exec the given command verbatim (e.g. `sh`)
 #
 # Extra args are forwarded, e.g. `push --force`.

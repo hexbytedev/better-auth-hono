@@ -10,13 +10,13 @@ places below or the fail-fast gate (`checkEnv()` in `src/index.ts`) will not pro
 
 ## 1. Pick the right helper (`src/lib/env.ts`)
 
-- `requireEnv("NAME")` — app must not start without it (auth secrets, `DATABASE_URL`, `RESEND_API_KEY`,
+- `requireEnv("NAME")`: app must not start without it (auth secrets, `DATABASE_URL`, `RESEND_API_KEY`,
   email/company identity). Missing `requireEnv` vars are accumulated into one set and reported together
   by `checkEnv()`; no extra wiring needed.
-- `envWithDefault("NAME", "default")` — safe fallback for local dev, but production should set it
+- `envWithDefault("NAME", "default")`: safe fallback for local dev, but production should set it
   (e.g. `JWT_EXPIRATION_TIME`, `TOKEN_EXPIRATION_SECONDS`, `PRIMARY_COLOR`). Logs a notice when the
   default is used.
-- `optionalEnv("NAME")` — truly optional, returns `undefined` when unset. Note: for feature flags the
+- `optionalEnv("NAME")`: truly optional, returns `undefined` when unset. Note: for feature flags the
   codebase often reads `process.env.NAME?.trim()` directly instead (see `FRAUD_CHECK_API_URL`,
   `isGoogleEnabled`, `EMAIL_OTP_ENABLED`); match the pattern already used in the file you edit.
 
@@ -28,7 +28,7 @@ enables/disables a non-critical feature.
 
 Call the helper (or `process.env.NAME?.trim()`) at the **top level** of the module that needs it
 (`src/auth.ts`, `src/lib/email.ts`, `src/config/app.config.ts`, `src/db/index.ts`, …).
-**Never** call these inside a request handler — that defeats `checkEnv()`, which runs once before the
+**Never** call these inside a request handler. That defeats `checkEnv()`, which runs once before the
 server starts and can only see module-scope reads.
 
 ## 3. Document it in `.env.sample`

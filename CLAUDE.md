@@ -4,6 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A detailed `AGENTS.md` already exists with code-style rules, env-var conventions, and a strict `.gitignore` access denylist (never read `.env*` except `.env.sample` / `.env.example`). Read it for conventions; this file covers commands and the big-picture architecture.
 
+## Writing rules
+
+- Never use the em dash character (U+2014) in code comments, inline comments, docs, or Markdown files (including
+  `.claude/skills/`, `.env.sample`, shell script comments, and OpenAPI description strings). Use proper punctuation instead: a
+  comma, colon, semicolon, parentheses, or a separate sentence, whichever fits the meaning. Do not substitute a hyphen or double
+  hyphen (`-`, `--`) for it. In unquoted YAML frontmatter (e.g. a skill's `description:`), avoid a colon followed by a space, since it breaks parsing.
+
 ## Commands
 
 Runtime is **Bun** (not Node). All scripts run through Bun.
@@ -13,9 +20,9 @@ Runtime is **Bun** (not Node). All scripts run through Bun.
 - Build: `bun run build` (bundles `src/index.ts` into `dist/`); run with `bun run start`
 - Lint: `bun run lint` (Biome check + autofix) / `bun run lint:check` (no writes, used in CI)
 - Format: `bun run format`
-- Tests: `bun run test` — single file `bun test src/index.smoke.test.ts` — single name `bun test -t "application smoke tests"`
+- Tests: `bun run test`; single file: `bun test src/index.smoke.test.ts`; single name: `bun test -t "application smoke tests"`
 - DB schema: `bun run push` syncs `src/db/schema.ts` straight to the DB (used for setup and updates, including a fresh database;
-  interactive — prompts before a change it can't apply automatically, so it needs a TTY). `bun run generate` optionally records the
+  interactive: it prompts before a change it can't apply automatically, so it needs a TTY). `bun run generate` optionally records the
   change as versioned SQL in `drizzle/`. `bun run studio` opens Drizzle Studio.
 
 `drizzle.config.ts` loads `.env.local` directly (not `dotenv/config`), so Drizzle commands need `DATABASE_URL` in `.env.local`. CI (`.github/workflows/ci.yml`) runs `lint:check`, `build`, `test`, and `bun audit --audit-level=high`. A pre-commit Husky hook runs `bun run lint`.
@@ -28,8 +35,8 @@ This is a deployable Better-Auth authentication server wrapped in Hono. The desi
 
 Import order is load-bearing and commented as such:
 
-1. `import "dotenv/config"` first — populates `process.env`.
-2. Sentry init second — reads `SENTRY_*` directly from `process.env`.
+1. `import "dotenv/config"` first, which populates `process.env`.
+2. Sentry init second, which reads `SENTRY_*` directly from `process.env`.
 3. Everything else after, then `checkEnv()` runs **before** the server starts.
 
 `checkEnv()` is the fail-fast gate. Env helpers in `src/lib/env.ts` (`requireEnv` / `envWithDefault` / `optionalEnv`) must be called at **module scope** so that missing `requireEnv` vars are accumulated into a single set and reported together by `checkEnv()` at startup. Calling them inside request handlers defeats this. See `AGENTS.md` for the three-place process when adding a new env var.
@@ -50,11 +57,11 @@ Drizzle ORM over `pg` Pool. `schema.ts` defines all tables with UUIDv7 primary k
 
 ### Internal user API (`src/routes/users.route.ts` + `src/services/user.service.ts`)
 
-A custom Basic-Auth-protected lookup API: `GET /api/users/id/:id` and `POST /api/users/email`. These routes are **conditionally mounted** in `index.ts` — only when both `API_AUTH_USER` and `API_AUTH_PASSWORD` are set (`isBasicAuthEnabled`). When disabled, the paths return 503. The service layer shapes responses through `UserResponseSchema` to avoid leaking sensitive columns (passwords, tokens) — routes never return raw DB rows.
+A custom Basic-Auth-protected lookup API: `GET /api/users/id/:id` and `POST /api/users/email`. These routes are **conditionally mounted** in `index.ts`, only when both `API_AUTH_USER` and `API_AUTH_PASSWORD` are set (`isBasicAuthEnabled`). When disabled, the paths return 503. The service layer shapes responses through `UserResponseSchema` to avoid leaking sensitive columns (passwords, tokens); routes never return raw DB rows.
 
 ### Middleware (`src/middleware/api-key.middleware.ts`)
 
-`validateBasicAuth` uses `timingSafeEqual` (via `safeCompare`) for credential comparison. An optional IP whitelist (`API_ALLOWED_IPS`, comma-separated, supports CIDR) is layered on top of Basic Auth when configured — it does not work without Basic Auth enabled. Client IPs come from `getClientIP()`, which reads the unspoofable TCP socket address and only trusts `X-Real-IP` / `X-Forwarded-For` when the connection originates from a `TRUSTED_PROXIES` entry (exact IP or CIDR, IPv4 or IPv6, matched via `ipaddr.js`). The reverse proxy is the trust boundary; for Cloudflare deployments nginx restores the real visitor IP and forwards it as `X-Real-IP` (see "Running behind nginx / Cloudflare" in the README).
+`validateBasicAuth` uses `timingSafeEqual` (via `safeCompare`) for credential comparison. An optional IP whitelist (`API_ALLOWED_IPS`, comma-separated, supports CIDR) is layered on top of Basic Auth when configured; it does not work without Basic Auth enabled. Client IPs come from `getClientIP()`, which reads the unspoofable TCP socket address and only trusts `X-Real-IP` / `X-Forwarded-For` when the connection originates from a `TRUSTED_PROXIES` entry (exact IP or CIDR, IPv4 or IPv6, matched via `ipaddr.js`). The reverse proxy is the trust boundary; for Cloudflare deployments nginx restores the real visitor IP and forwards it as `X-Real-IP` (see "Running behind nginx / Cloudflare" in the README).
 
 ### Email (`src/lib/email.ts`)
 
@@ -63,7 +70,7 @@ All transactional email goes through Resend. The `Resend` client is constructed 
 ### Config & redaction
 
 - `src/config/app.config.ts` centralizes CORS origins (`getAllowedOrigins`), port/host parsing with validation, and reads `CLIENT_URL`.
-- `src/lib/redaction.ts` provides `maskEmail` (and IP masking lives in `auth.ts`) — used everywhere before logging PII to console or Sentry.
+- `src/lib/redaction.ts` provides `maskEmail` (IP masking lives in `auth.ts`); both are used everywhere before logging PII to console or Sentry.
 
 ## Testing
 
@@ -73,5 +80,5 @@ All transactional email goes through Resend. The `Resend` client is constructed 
 
 A single Docker image `better-auth-hono` serves the app and sets up the DB schema. `docker-entrypoint.sh` dispatches on the container
 command: default/`app` starts the server, `push` syncs `src/db/schema.ts` into the database. The `runner` stage builds from `base` so
-`drizzle-kit` and the `drizzle/` files are present. See `Dockerfile`, `docker-compose.yml` (runs the same image twice — a `push` one-shot
+`drizzle-kit` and the `drizzle/` files are present. See `Dockerfile`, `docker-compose.yml` (runs the same image twice: a `push` one-shot
 the app depends on), and the `build-and-push.yml` workflow (builds on tag push / manual dispatch). Do not hand-edit `dist/`.

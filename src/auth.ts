@@ -492,7 +492,7 @@ export const auth = betterAuth({
 				// signup template. Note: Better Auth's updateEmailWithoutVerification path
 				// creates this token with no updateTo/requestType at all, so it is
 				// indistinguishable from a signup token and always falls through to the
-				// signup copy below — a Better Auth API gap, not something fixable here.
+				// signup copy below. This is a Better Auth API gap, not something fixable here.
 				const isChangeEmail = isChangeEmailVerificationToken(token);
 				try {
 					if (isChangeEmail) {

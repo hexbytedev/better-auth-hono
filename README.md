@@ -1,7 +1,7 @@
 # Better-Auth Hono - Production-ready Auth Server
 
 > [!TIP]
-> **Live demo — no deployment required.** Try the full login process at **[authtry.hexbyte.dev](https://authtry.hexbyte.dev)**.
+> **Live demo: no deployment required.** Try the full login process at **[authtry.hexbyte.dev](https://authtry.hexbyte.dev)**.
 
 This repository packages Better-Auth into a focused, deployable Docker image that delivers a complete authentication service (passkeys, TOTP, JWTs, social OAuth, email/password, email OTP, and an internal lookup API) with pragmatic operational defaults applied.
 
@@ -17,7 +17,7 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 - Drizzle ORM schema with UUID primary keys and indices optimized for fast lookups (see `src/db/schema.ts`).
 - JWT support for microservices (`src/auth.ts`) and an internal Basic-Auth protected user lookup API (`GET /api/users/id/:id`, `POST /api/users/email`).
 - Email OTP authentication: sign-in, email verification, and password reset via one-time codes.
-- Sign up fraud protection: when `FRAUD_CHECK_API_URL` is configured, each registration's email must be explicitly allowed by the [DeGhost fraud detection API](https://deghost.hexbyte.dev) (API endpoint: <https://deghostapi.hexbyte.dev>) or the signup is blocked (fail-closed); the client IP is additionally screened for disposable/abusive sources and threat signals. Optionally, sign-ups from public/free email providers (gmail.com, etc.) can be rejected via `BLOCK_PUBLIC_DOMAIN_SIGNUP` — handy for B2B apps that only accept organization email.
+- Sign up fraud protection: when `FRAUD_CHECK_API_URL` is configured, each registration's email must be explicitly allowed by the [DeGhost fraud detection API](https://deghost.hexbyte.dev) (API endpoint: <https://deghostapi.hexbyte.dev>) or the signup is blocked (fail-closed); the client IP is additionally screened for disposable/abusive sources and threat signals. Optionally, sign-ups from public/free email providers (gmail.com, etc.) can be rejected via `BLOCK_PUBLIC_DOMAIN_SIGNUP`, which is handy for B2B apps that only accept organization email.
 
 ## Features at a Glance
 

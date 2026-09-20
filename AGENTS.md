@@ -27,14 +27,14 @@
 
 When adding a new env var, make changes in three places:
 
-1. **`src/lib/env.ts`** — Use one of three helpers:
-   - `requireEnv("NAME")` — app won't start without it (security-critical, DB credentials, API keys). Multiple missing vars are collected and reported together.
-   - `envWithDefault("NAME", "default")` — has a safe fallback for local dev (e.g. `JWT_EXPIRATION_TIME`, `PRIMARY_COLOR`). Logs a notice when default is used.
-   - `optionalEnv("NAME")` — truly optional, returns `undefined` if not set (e.g. feature flags, optional API URLs).
+1. **`src/lib/env.ts`**: Use one of three helpers:
+   - `requireEnv("NAME")`: app won't start without it (security-critical, DB credentials, API keys). Multiple missing vars are collected and reported together.
+   - `envWithDefault("NAME", "default")`: has a safe fallback for local dev (e.g. `JWT_EXPIRATION_TIME`, `PRIMARY_COLOR`). Logs a notice when default is used.
+   - `optionalEnv("NAME")`: truly optional, returns `undefined` if not set (e.g. feature flags, optional API URLs).
 
-2. **`.env.sample`** — Add the variable with a comment block explaining its purpose, format, and default value. Use the same section header style as existing entries.
+2. **`.env.sample`**: Add the variable with a comment block explaining its purpose, format, and default value. Use the same section header style as existing entries.
 
-3. **Usage site** — Read it at module scope in the file that needs it (e.g. `src/auth.ts`, `src/lib/email.ts`, `src/db/index.ts`).
+3. **Usage site**: Read it at module scope in the file that needs it (e.g. `src/auth.ts`, `src/lib/email.ts`, `src/db/index.ts`).
 
 **How to judge required vs optional:**
 
@@ -67,7 +67,7 @@ Lint/Format
 
 DB (Drizzle)
 
-- `bun run push` (wrapper for `bunx drizzle-kit push`, syncs the schema to the DB; interactive — prompts on changes it can't apply automatically)
+- `bun run push` (wrapper for `bunx drizzle-kit push` that syncs the schema to the DB; interactive, so it prompts on changes it can't apply automatically)
 - `bun run generate` (wrapper for `bunx drizzle-kit generate`, optionally emits versioned SQL into `drizzle/`)
 - `bun run studio` (wrapper for `bunx drizzle-kit studio`, opens Drizzle Studio)
 
@@ -155,13 +155,14 @@ CI
 
 - Comments are used to explain non-obvious behavior or flows.
 - Prefer self-describing code; only add comments when clarity needs it.
+- Never use the em dash character (U+2014) in comments or inline comments; use proper punctuation (see Markdown Formatting below).
 
 ## Markdown Formatting (for README and docs)
 
 - Use ATX headers only (`#`, `##`, `###`). Do not use setext-style underlined headers.
 - Insert an extra blank line between a header and the first following paragraph or list.
 - Use `-` (dash) for list bullets. Do not use double em-dash characters in place of bullets.
-- Prefer ASCII hyphen `-` for an inline dash instead of the unicode em-dash `—` (avoid non-ASCII punctuation unless the file already uses it).
+- Never use the em dash character (U+2014) in docs or Markdown files. Use proper punctuation instead: a comma, colon, semicolon, parentheses, or a separate sentence, whichever fits the meaning. Do not substitute a hyphen or double hyphen (`-`, `--`) for it.
 - Keep phrasing concise and avoid repeating the same claim multiple times in the same document.
 
 ## When Adding Tests (Recommended Pattern)

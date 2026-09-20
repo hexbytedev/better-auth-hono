@@ -347,7 +347,7 @@ export async function sendChangeEmailConfirmationEmail(
 	`;
 
 	const footerContent = `
-		If you didn't request an email change, you can safely ignore this email — and consider reviewing your account's security. Your account email will remain unchanged.
+		If you didn't request an email change, you can safely ignore this email and consider reviewing your account's security. Your account email will remain unchanged.
 	`;
 
 	const html = getEmailTemplate(subject, bodyContent, footerContent);

@@ -209,7 +209,7 @@ export function getClientIP(c: Context): string {
 
 // Per-process salt and key length for the comparison KDF. The salt only needs
 // to be identical across the two digests of a single comparison, so a random
-// value generated once at startup is sufficient — and it keeps the digests
+// value generated once at startup is sufficient, and it keeps the digests
 // unpredictable across restarts.
 const COMPARE_SALT = randomBytes(16);
 const COMPARE_KEYLEN = 32;

@@ -20,7 +20,7 @@ describe("isChangeEmailVerificationToken", () => {
 	test("detects a change-email token via updateTo even without requestType (updateEmailWithoutVerification path)", () => {
 		const token = encodePayload({ email: "new@example.com", updateTo: undefined });
 		// Better Auth's updateEmailWithoutVerification path creates the token with
-		// just the new email, no updateTo/requestType at all — that one genuinely
+		// just the new email, no updateTo/requestType at all; that one genuinely
 		// can't be distinguished from a signup token and is documented as a known gap.
 		expect(isChangeEmailVerificationToken(token)).toBe(false);
 

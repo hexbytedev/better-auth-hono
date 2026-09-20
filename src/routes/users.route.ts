@@ -69,13 +69,13 @@ const jsonError = (description: string) => ({
 // Error responses shared by both lookups. 401/403/400-from-auth are produced by
 // the validateBasicAuth middleware; 400-from-validation by the defaultHook below.
 const sharedErrorResponses = {
-	400: jsonError("Bad Request — invalid email/UUID or malformed request body."),
-	401: jsonError("Unauthorized — missing or invalid Basic Auth credentials."),
+	400: jsonError("Bad Request: invalid email/UUID or malformed request body."),
+	401: jsonError("Unauthorized: missing or invalid Basic Auth credentials."),
 	403: jsonError(
-		"Forbidden — client IP is not in API_ALLOWED_IPS (only when the IP whitelist is enabled).",
+		"Forbidden: client IP is not in API_ALLOWED_IPS (only when the IP whitelist is enabled).",
 	),
-	404: jsonError("Not Found — no user matched the lookup."),
-	500: jsonError("Internal Server Error — database or system failure."),
+	404: jsonError("Not Found: no user matched the lookup."),
+	500: jsonError("Internal Server Error: database or system failure."),
 };
 
 const usersRoute = new OpenAPIHono({

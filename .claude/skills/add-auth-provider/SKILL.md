@@ -1,12 +1,12 @@
 ---
 name: add-auth-provider
-description: Use when extending Better-Auth in src/auth.ts — enabling a social provider (Google/GitHub), adding or configuring a plugin, or wiring a transactional email flow. Covers the env-presence feature-flag pattern, conditional config spreads, and Resend email templates.
+description: Use when extending Better-Auth in src/auth.ts, such as enabling a social provider (Google/GitHub), adding or configuring a plugin, or wiring a transactional email flow. Covers the env-presence feature-flag pattern, conditional config spreads, and Resend email templates.
 ---
 
 # Extend the Better-Auth config
 
 All auth customization is centralized in the single `betterAuth({...})` object in `src/auth.ts`. Keep
-Better-Auth itself unmodified — add behavior around it.
+Better-Auth itself unmodified; add behavior around it.
 
 ## Feature-flag pattern (env presence)
 
@@ -38,7 +38,7 @@ that delegates to `src/lib/email.ts`:
 - Add the template function in `src/lib/email.ts`. **HTML-escape every user-supplied value** with
   `escapeHtml` / `escapeHtmlAttribute` before templating, and reuse `getEmailTemplate(...)`.
 - In the callback, wrap the send in `try/catch`, `Sentry.captureException(error, { tags: { feature: "auth", operation: "..." }, ... })`, and **re-throw** so Better-Auth knows the send failed (except fire-and-forget flows like `emailOTP`, which catch-and-report without throwing).
-- The `Resend` client is created lazily via `getResend()` — do not construct it at module load.
+- The `Resend` client is created lazily via `getResend()`; do not construct it at module load.
 
 ## Verify
 
