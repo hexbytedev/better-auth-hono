@@ -20,7 +20,7 @@
     "@better-auth/expo": "^1.7.5",
     "@better-auth/passkey": "^1.7.5",
     "@hono/zod-openapi": "^1.6.3",
-    "@scalar/hono-api-reference": "^0.12.2",
+    "@scalar/hono-api-reference": "^0.12.3",
     "@sentry/bun": "^10.75.0",
     "better-auth": "^1.7.5",
     "dotenv": "^18.0.1",
