@@ -30,7 +30,7 @@
     "pg": "^8.23.0",
     "resend": "^6.28.1",
     "uuid": "^14.0.2",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
