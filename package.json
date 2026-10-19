@@ -18,7 +18,7 @@
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.7.5",
     "@better-auth/expo": "^1.7.5",
-    "@better-auth/passkey": "^1.7.5",
+    "@better-auth/passkey": "^1.7.10",
     "@hono/zod-openapi": "^1.6.3",
     "@scalar/hono-api-reference": "^0.12.2",
     "@sentry/bun": "^10.75.0",
