@@ -25,12 +25,12 @@
     "better-auth": "^1.7.5",
     "dotenv": "^18.0.1",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.13.8",
+    "hono": "^4.13.13",
     "ipaddr.js": "^2.5.0",
     "pg": "^8.23.0",
     "resend": "^6.28.1",
     "uuid": "^14.0.2",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
@@ -38,5 +38,9 @@
     "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.10",
     "husky": "^9.1.7"
+  },
+  "overrides": {
+    "zod": "^4.6.7",
+    "esbuild": "^0.25.12"
   }
 }
