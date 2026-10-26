@@ -36,7 +36,9 @@ ENV NODE_ENV=production
 # Built application bundle
 COPY --from=builder /app/dist ./dist
 
-# Default email templates (Handlebars). Override per project with EMAIL_TEMPLATES_DIR.
+# Email templates (Handlebars): the built-in defaults live in /app/templates/email. To use another
+# design, mount your own folder and set EMAIL_TEMPLATES_DIR to its path inside the container
+# (see README, "Use your own email templates").
 COPY templates ./templates
 
 # Files drizzle-kit needs: migration SQL + config (for `migrate`) and the

@@ -19,6 +19,11 @@ services:
       - .env.local
     ports:
       - '172.17.0.1:8558:8558'
+    # Custom email templates (optional). Left of the colon: a folder on this server
+    # (adjust freely). Right of the colon: where it appears in the container; set
+    # EMAIL_TEMPLATES_DIR in .env.local to exactly that path. See README, step 4.
+    # volumes:
+    #   - ./email-templates:/app/email-templates:ro
     depends_on:
       better-auth-hono-migrate:
         condition: service_completed_successfully

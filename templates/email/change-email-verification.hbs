@@ -1,6 +1,6 @@
 {{#> layout}}
 	{{#*inline "body"}}
-		<p>Hello {{name}},</p>
+		<p>{{#if name}}Hello {{name}},{{else}}Hello,{{/if}}</p>
 		<p>We received a request to use <strong>{{email}}</strong> as the email for your account. Click the button below to confirm this address and finish the change.</p>
 		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 10px; margin-bottom: 10px;">
 			<tr>

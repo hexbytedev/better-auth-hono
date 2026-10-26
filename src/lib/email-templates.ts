@@ -14,7 +14,7 @@ export const OTP_TYPES = [
 export type OtpType = (typeof OTP_TYPES)[number];
 
 /**
- * Every email the server can send. The kind doubles as the subjects.json key,
+ * Every email the server can send. The kind doubles as the config.json subjects key,
  * and (minus the `otp-` prefix) as the template file name.
  */
 export const EMAIL_KINDS = [
@@ -29,6 +29,7 @@ export type EmailKind = (typeof EMAIL_KINDS)[number];
 /** Variables available to every template and subject. Optional ones depend on the email kind. */
 export interface EmailTemplateData {
 	expiresIn: string;
+	expiresInDe: string;
 	name?: string;
 	url?: string;
 	email?: string;
@@ -63,6 +64,7 @@ function sentinelData(otpType?: OtpType): EmailTemplateData {
 		name: "SENTINEL_name",
 		url: SENTINEL_URL,
 		expiresIn: "SENTINEL_expiresIn",
+		expiresInDe: "SENTINEL_expiresInDe",
 		email: "SENTINEL_email",
 		newEmail: "SENTINEL_newEmail",
 		otp: "SENTINEL_otp",
@@ -78,20 +80,58 @@ function isSubjectMap(value: object): value is SubjectMap {
 	return Object.values(value).every((entry) => typeof entry === "string");
 }
 
-function parseSubjects(path: string): SubjectMap {
+interface TemplateConfig {
+	/** Sender display name, e.g. "Acme" in `Acme <no-reply@acme.com>`. */
+	fromName: string;
+	/** Subject line per email kind (Handlebars strings). */
+	subjects: SubjectMap;
+}
+
+function parseConfig(path: string): Partial<TemplateConfig> {
 	const parsed: object = JSON.parse(readFileSync(path, "utf8"));
-	if (Array.isArray(parsed) || !isSubjectMap(parsed)) {
-		throw new Error(`${path} must be a JSON object mapping email kinds to subject strings`);
+	const fromName = "fromName" in parsed ? parsed.fromName : undefined;
+	const subjects = "subjects" in parsed ? parsed.subjects : undefined;
+
+	if (fromName !== undefined && typeof fromName !== "string") {
+		throw new Error(`${path}: "fromName" must be a string`);
 	}
-	return parsed;
+	// These would break the From header, e.g. `Doe, Inc. <a@b.com>` or an injected extra header.
+	if (fromName !== undefined && /[<>",;\r\n]/.test(fromName)) {
+		throw new Error(`${path}: "fromName" must not contain < > " , ; or line breaks`);
+	}
+	if (
+		subjects !== undefined &&
+		(typeof subjects !== "object" ||
+			subjects === null ||
+			Array.isArray(subjects) ||
+			!isSubjectMap(subjects))
+	) {
+		throw new Error(`${path}: "subjects" must be an object mapping email kinds to strings`);
+	}
+	return { fromName: fromName?.trim(), subjects };
+}
+
+/**
+ * Reads `config.json` ({ "fromName": "...", "subjects": { "<email kind>": "..." } }). The custom
+ * directory is overlaid on the built-in one: its `fromName` wins and its `subjects` are merged per
+ * key, so a project can override a single subject. Keeping the sender name and subjects in one file
+ * (and out of env vars) means the whole brand lives in the template folder.
+ */
+export function loadTemplateConfig(customDir?: string): TemplateConfig {
+	const base = parseConfig(join(DEFAULT_TEMPLATES_DIR, "config.json"));
+	const customPath = customDir ? join(resolve(customDir), "config.json") : undefined;
+	const custom = customPath && existsSync(customPath) ? parseConfig(customPath) : {};
+	return {
+		fromName: custom.fromName ?? base.fromName ?? "",
+		subjects: { ...base.subjects, ...custom.subjects },
+	};
 }
 
 /**
  * Loads, compiles and validates every email template, returning a render function.
  *
  * Files are looked up in `customDir` first, then in the built-in defaults, so a project can
- * override only the files it cares about (typically `layout.hbs`). subjects.json is merged per
- * key. Every email is rendered once with sentinel values, so a syntax error, a missing partial, a
+ * override only the files it cares about (typically `layout.hbs`). config.json is merged per key. Every email is rendered once with sentinel values, so a syntax error, a missing partial, a
  * template that drops a required variable (the action link, the code, ...) or one that uses
  * unescaped `{{{ }}}` output throws here (at startup) instead of when a user requests a reset.
  */
@@ -129,17 +169,13 @@ export function createEmailRenderer(customDir?: string): EmailRenderer {
 	hbs.registerHelper("eq", (a: string, b: string) => a === b);
 	hbs.registerPartial("layout", layoutSource);
 
-	const subjectSources = parseSubjects(join(DEFAULT_TEMPLATES_DIR, "subjects.json"));
-	const customSubjects = customRoot ? join(customRoot, "subjects.json") : undefined;
-	if (customSubjects && existsSync(customSubjects)) {
-		Object.assign(subjectSources, parseSubjects(customSubjects));
-	}
+	const subjectSources = loadTemplateConfig(customRoot).subjects;
 
 	const subjects = {} as Record<EmailKind, Handlebars.TemplateDelegate<EmailTemplateData>>;
 	const bodies: Record<string, Handlebars.TemplateDelegate<RenderContext>> = {};
 	for (const kind of EMAIL_KINDS) {
 		const source = subjectSources[kind];
-		if (!source) throw new Error(`subjects.json has no subject for "${kind}"`);
+		if (!source) throw new Error(`config.json has no subject for "${kind}"`);
 		// Subjects are plain text, so they must not be HTML-escaped.
 		subjects[kind] = hbs.compile<EmailTemplateData>(source, { noEscape: true });
 
@@ -178,8 +214,37 @@ export function createEmailRenderer(customDir?: string): EmailRenderer {
 	return render;
 }
 
+const OVERRIDABLE_FILES = [
+	"layout.hbs",
+	...new Set(EMAIL_KINDS.map((kind) => `${templateFileFor(kind)}.hbs`)),
+	"config.json",
+];
+
+/** Logs where templates come from, so a wrong mount path shows up at startup, not as "wrong design". */
+function logTemplateSource(customDir?: string): void {
+	if (!customDir) {
+		console.log("[EMAIL] Using the built-in email templates");
+		return;
+	}
+	const root = resolve(customDir);
+	const found = OVERRIDABLE_FILES.filter((file) => existsSync(join(root, file)));
+	if (found.length === 0) {
+		console.warn(
+			`[EMAIL] EMAIL_TEMPLATES_DIR (${root}) contains no template files, using the built-in templates. Check the mount path.`,
+		);
+		return;
+	}
+	console.log(`[EMAIL] Using templates from ${root}, overriding: ${found.join(", ")}`);
+}
+
+const EMAIL_TEMPLATES_DIR = optionalEnv("EMAIL_TEMPLATES_DIR");
+logTemplateSource(EMAIL_TEMPLATES_DIR);
+
+/** Sender display name from the template folder, or "" when there is none. */
+export const EMAIL_FROM_NAME: string = loadTemplateConfig(EMAIL_TEMPLATES_DIR).fromName;
+
 /**
  * Renders an email's subject and HTML body from the configured templates. Every value is
  * HTML-escaped by Handlebars unless a template opts out with triple braces.
  */
-export const renderEmail: EmailRenderer = createEmailRenderer(optionalEnv("EMAIL_TEMPLATES_DIR"));
+export const renderEmail: EmailRenderer = createEmailRenderer(EMAIL_TEMPLATES_DIR);

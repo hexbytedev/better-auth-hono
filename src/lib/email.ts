@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/bun";
 import { Resend } from "resend";
 import { OTP_EXPIRATION_SECONDS, TOKEN_EXPIRATION_SECONDS } from "../config/app.config";
 import {
+	EMAIL_FROM_NAME,
 	type EmailKind,
 	type EmailTemplateData,
 	type OtpType,
@@ -13,9 +14,12 @@ import { requireEnv } from "./env";
 
 const RESEND_API_KEY = requireEnv("RESEND_API_KEY");
 const EMAIL_FROM = requireEnv("EMAIL_FROM");
-// Resend accepts either "no-reply@example.com" or "Brand <no-reply@example.com>" for `from`.
-// Reply-To gets the bare address.
+// EMAIL_FROM is normally a bare address; the sender name comes from the templates' config.json.
+// A "Name <address>" value still works and wins, so existing configs keep their From header.
+// Reply-To always gets the bare address.
 const EMAIL_FROM_ADDRESS = EMAIL_FROM.match(/<([^>]+)>/)?.[1] ?? EMAIL_FROM;
+const EMAIL_FROM_HEADER =
+	EMAIL_FROM.includes("<") || !EMAIL_FROM_NAME ? EMAIL_FROM : `${EMAIL_FROM_NAME} <${EMAIL_FROM}>`;
 
 // Deferred to avoid crash during module init when env vars are missing.
 // By the time sendEmail runs, checkEnv() has already validated all requireEnv() calls.
@@ -25,33 +29,70 @@ function getResend(): Resend {
 	return resend;
 }
 
+type Locale = "en" | "de";
+
+// Units per locale: [singular, plural]. German is used by bilingual templates ({{expiresInDe}}).
+const TIME_UNITS: Record<
+	Locale,
+	{
+		hour: [string, string];
+		minute: [string, string];
+		second: [string, string];
+		and: string;
+		fallback: string;
+	}
+> = {
+	en: {
+		hour: ["hour", "hours"],
+		minute: ["minute", "minutes"],
+		second: ["second", "seconds"],
+		and: "and",
+		fallback: "a short time",
+	},
+	de: {
+		hour: ["Stunde", "Stunden"],
+		minute: ["Minute", "Minuten"],
+		second: ["Sekunde", "Sekunden"],
+		and: "und",
+		fallback: "kurze Zeit",
+	},
+};
+
 // Helper to convert seconds to human-readable format
-function formatExpirationTime(seconds: number): string {
+function formatExpirationTime(seconds: number, locale: Locale = "en"): string {
+	const units = TIME_UNITS[locale];
 	// Safety net for non-finite / zero / negative durations. With the range
 	// validation in app.config.ts these never reach here, but guard anyway so a
 	// misconfiguration can't render "0 second" / "-30 seconds" / "NaN second".
 	if (!Number.isFinite(seconds) || seconds <= 0) {
-		return "a short time";
+		return units.fallback;
 	}
 
+	const count = (value: number, [singular, plural]: [string, string]) =>
+		`${value} ${value === 1 ? singular : plural}`;
 	const hours = Math.floor(seconds / 3600);
 	const minutes = Math.floor((seconds % 3600) / 60);
 
 	if (hours > 0 && minutes > 0) {
-		return `${hours} hour${hours !== 1 ? "s" : ""} and ${minutes} minute${minutes !== 1 ? "s" : ""}`;
+		return `${count(hours, units.hour)} ${units.and} ${count(minutes, units.minute)}`;
 	}
 	if (hours > 0) {
-		return `${hours} hour${hours !== 1 ? "s" : ""}`;
+		return count(hours, units.hour);
 	}
 	if (minutes > 0) {
-		return `${minutes} minute${minutes !== 1 ? "s" : ""}`;
+		return count(minutes, units.minute);
 	}
-	return `${seconds} second${seconds !== 1 ? "s" : ""}`;
+	return count(seconds, units.second);
 }
 
 interface User {
 	email: string;
 	name?: string;
+}
+
+/** The user's name for a greeting, or undefined so templates can fall back to a plain "Hello,". */
+function greetingName(user: User): string | undefined {
+	return user.name?.trim() || undefined;
 }
 
 /** Renders the template for `kind` with the formatted expiry, then sends it. */
@@ -65,6 +106,7 @@ async function sendTemplatedEmail(
 	const { expiresInSeconds, ...rest } = data;
 	const { subject, html } = renderEmail(kind, {
 		expiresIn: formatExpirationTime(expiresInSeconds),
+		expiresInDe: formatExpirationTime(expiresInSeconds, "de"),
 		...rest,
 	});
 	return sendEmail(kind, to, subject, html);
@@ -72,7 +114,7 @@ async function sendTemplatedEmail(
 
 async function sendEmail(emailType: string, to: string, subject: string, html: string) {
 	const { data, error } = await getResend().emails.send({
-		from: EMAIL_FROM,
+		from: EMAIL_FROM_HEADER,
 		to: [to],
 		subject,
 		html,
@@ -113,7 +155,7 @@ async function sendEmail(emailType: string, to: string, subject: string, html: s
  */
 export async function sendVerificationEmail(user: User, verificationUrl: string) {
 	return sendTemplatedEmail("verification", user.email, {
-		name: user.name || "there",
+		name: greetingName(user),
 		url: verificationUrl,
 		expiresInSeconds: TOKEN_EXPIRATION_SECONDS,
 	});
@@ -127,7 +169,7 @@ export async function sendVerificationEmail(user: User, verificationUrl: string)
  */
 export async function sendPasswordResetEmail(user: User, resetUrl: string) {
 	return sendTemplatedEmail("password-reset", user.email, {
-		name: user.name || "there",
+		name: greetingName(user),
 		url: resetUrl,
 		expiresInSeconds: TOKEN_EXPIRATION_SECONDS,
 	});
@@ -156,7 +198,7 @@ export async function sendOtpEmail(email: string, otp: string, type: OtpType) {
  */
 export async function sendChangeEmailVerificationEmail(user: User, verificationUrl: string) {
 	return sendTemplatedEmail("change-email-verification", user.email, {
-		name: user.name || "there",
+		name: greetingName(user),
 		email: user.email,
 		url: verificationUrl,
 		expiresInSeconds: TOKEN_EXPIRATION_SECONDS,
@@ -177,7 +219,7 @@ export async function sendChangeEmailConfirmationEmail(
 	confirmationUrl: string,
 ) {
 	return sendTemplatedEmail("change-email-confirmation", user.email, {
-		name: user.name || "there",
+		name: greetingName(user),
 		newEmail,
 		url: confirmationUrl,
 		expiresInSeconds: TOKEN_EXPIRATION_SECONDS,

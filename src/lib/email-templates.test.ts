@@ -6,11 +6,13 @@ import {
 	createEmailRenderer,
 	EMAIL_KINDS,
 	type EmailTemplateData,
+	loadTemplateConfig,
 	OTP_TYPES,
 } from "./email-templates";
 
 const data: EmailTemplateData = {
 	expiresIn: "1 hour",
+	expiresInDe: "1 Stunde",
 	name: "Ada",
 	url: "https://example.com/verify?token=abc&next=%2Fhome",
 	email: "ada@example.com",
@@ -94,9 +96,11 @@ describe("custom email templates", () => {
 		expect(html).not.toContain("<!DOCTYPE html>");
 	});
 
-	test("merges subjects.json per key and does not HTML-escape subjects", () => {
+	test("merges config.json subjects per key and does not HTML-escape subjects", () => {
 		const dir = makeTemplatesDir({
-			"subjects.json": JSON.stringify({ "password-reset": "{{name}} & co: reset your password" }),
+			"config.json": JSON.stringify({
+				subjects: { "password-reset": "{{name}} & co: reset your password" },
+			}),
 		});
 		const render = createEmailRenderer(dir);
 		expect(render("password-reset", data).subject).toBe("Ada & co: reset your password");
@@ -129,9 +133,11 @@ describe("custom email templates", () => {
 		expect(() => createEmailRenderer(dir)).toThrow(/password-reset.*nonexistent/);
 	});
 
-	test("throws when subjects.json is malformed", () => {
-		const dir = makeTemplatesDir({ "subjects.json": JSON.stringify({ verification: 5 }) });
-		expect(() => createEmailRenderer(dir)).toThrow("subjects.json");
+	test("throws when config.json subjects are malformed", () => {
+		const dir = makeTemplatesDir({
+			"config.json": JSON.stringify({ subjects: { verification: 5 } }),
+		});
+		expect(() => createEmailRenderer(dir)).toThrow("subjects");
 	});
 
 	test("rejects a template that drops the action link", () => {
@@ -174,5 +180,53 @@ describe("custom email templates", () => {
 		expect(() => createEmailRenderer(noBody)).toThrow('"body"');
 		const noFooter = makeTemplatesDir({ "layout.hbs": "<html>{{subject}} {{> body}}</html>" });
 		expect(() => createEmailRenderer(noFooter)).toThrow('"footer"');
+	});
+});
+
+describe("variables for bilingual designs", () => {
+	test("a custom template can print the German expiry text next to the English one", () => {
+		const dir = makeTemplatesDir({
+			"verification.hbs": verificationWith(
+				'<a href="{{url}}">go</a> DE {{expiresInDe}} | EN {{expiresIn}}',
+			),
+		});
+		const { html } = createEmailRenderer(dir)("verification", data);
+		expect(html).toContain("DE 1 Stunde | EN 1 hour");
+	});
+
+	test("the built-in templates greet without a name instead of printing an empty one", () => {
+		const { html } = createEmailRenderer()("password-reset", { ...data, name: undefined });
+		expect(html).toContain("Hello,");
+		expect(html).not.toContain("Hello ,");
+	});
+});
+
+describe("config.json (sender name and subjects)", () => {
+	test("the built-in templates have no sender name", () => {
+		expect(loadTemplateConfig().fromName).toBe("");
+	});
+
+	test("a custom config.json overrides the sender name, and a missing one falls back", () => {
+		const custom = makeTemplatesDir({
+			"config.json": JSON.stringify({ fromName: "  Acme GmbH " }),
+		});
+		expect(loadTemplateConfig(custom).fromName).toBe("Acme GmbH");
+		expect(loadTemplateConfig(makeTemplatesDir({})).fromName).toBe("");
+	});
+
+	test("a custom config without fromName keeps the default, and an empty one clears it", () => {
+		const onlySubjects = makeTemplatesDir({ "config.json": JSON.stringify({ subjects: {} }) });
+		expect(loadTemplateConfig(onlySubjects).fromName).toBe("");
+		const cleared = makeTemplatesDir({ "config.json": JSON.stringify({ fromName: "" }) });
+		expect(loadTemplateConfig(cleared).fromName).toBe("");
+	});
+
+	test("rejects characters that would break the From header", () => {
+		for (const fromName of ["Evil <x@y.z>", 'Say "hi"', "Doe, Inc.", "A\r\nBcc: x@y.z", "A;B"]) {
+			const dir = makeTemplatesDir({ "config.json": JSON.stringify({ fromName }) });
+			expect(() => loadTemplateConfig(dir)).toThrow("fromName");
+		}
+		const wrongType = makeTemplatesDir({ "config.json": JSON.stringify({ fromName: 5 }) });
+		expect(() => loadTemplateConfig(wrongType)).toThrow("string");
 	});
 });
