@@ -35,8 +35,10 @@ The `jwt` plugin's `definePayload` is where DB-derived claims for downstream ser
 Any auth action that emails the user (verification, reset, OTP, change-email) wires a `send...` callback
 that delegates to `src/lib/email.ts`:
 
-- Add the template function in `src/lib/email.ts`. **HTML-escape every user-supplied value** with
-  `escapeHtml` / `escapeHtmlAttribute` before templating, and reuse `getEmailTemplate(...)`.
+- Add the email as a new kind in `src/lib/email-templates.ts` (`EMAIL_KINDS`), a subject in
+  `templates/email/subjects.json`, and a Handlebars file in `templates/email/` that wraps `{{#> layout}}`.
+  Add a `send...` function in `src/lib/email.ts` that calls `sendTemplatedEmail(...)`. `{{value}}` is
+  HTML-escaped automatically; never use `{{{value}}}` for user-supplied values.
 - In the callback, wrap the send in `try/catch`, `Sentry.captureException(error, { tags: { feature: "auth", operation: "..." }, ... })`, and **re-throw** so Better-Auth knows the send failed (except fire-and-forget flows like `emailOTP`, which catch-and-report without throwing).
 - The `Resend` client is created lazily via `getResend()`; do not construct it at module load.
 

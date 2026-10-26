@@ -36,6 +36,9 @@ ENV NODE_ENV=production
 # Built application bundle
 COPY --from=builder /app/dist ./dist
 
+# Default email templates (Handlebars). Override per project with EMAIL_TEMPLATES_DIR.
+COPY templates ./templates
+
 # Files drizzle-kit needs: migration SQL + config (for `migrate`) and the
 # schema (for `push`). node_modules (incl. drizzle-kit) come from the base stage.
 COPY drizzle.config.ts ./

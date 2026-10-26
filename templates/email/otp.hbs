@@ -1,0 +1,24 @@
+{{#> layout}}
+	{{#*inline "body"}}
+		{{#if (eq otpType "sign-in")}}
+		<p>Use the following code to sign in to your account.</p>
+		{{else if (eq otpType "email-verification")}}
+		<p>Use the following code to verify your email address.</p>
+		{{else if (eq otpType "forget-password")}}
+		<p>Use the following code to reset your password.</p>
+		{{else if (eq otpType "change-email")}}
+		<p>Use the following code to confirm your new email address.</p>
+		{{/if}}
+		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 20px; margin-bottom: 20px;">
+			<tr>
+				<td align="center">
+					<div style="display: inline-block; background-color: #f4f4f5; border: 2px dashed #d4d4d8; border-radius: 12px; padding: 24px 48px; letter-spacing: 8px; font-size: 36px; font-weight: 700; color: #18181b; font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;">{{otp}}</div>
+				</td>
+			</tr>
+		</table>
+		<p style="font-size: 14px; color: #71717a;">This code will expire in {{expiresIn}}. If you didn't request this, you can safely ignore this email.</p>
+	{{/inline}}
+	{{#*inline "footer"}}
+		If you didn't request this code, someone else might be trying to access your account. Please ignore this email.
+	{{/inline}}
+{{/layout}}

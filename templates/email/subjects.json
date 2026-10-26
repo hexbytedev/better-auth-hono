@@ -1,0 +1,10 @@
+{
+	"verification": "Verify your email address",
+	"password-reset": "Reset your password",
+	"otp-sign-in": "Your sign-in code",
+	"otp-email-verification": "Verify your email address",
+	"otp-forget-password": "Reset your password",
+	"otp-change-email": "Confirm your new email",
+	"change-email-verification": "Confirm your new email address",
+	"change-email-confirmation": "Approve email change"
+}

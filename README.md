@@ -95,8 +95,7 @@ Required in every deployment:
 | `CLIENT_URL` | Frontend URL used as a CORS origin and the JWT audience. |
 | `DATABASE_URL` | PostgreSQL connection string. |
 | `RESEND_API_KEY` | Resend API key for sending email. |
-| `EMAIL_FROM` | Verified "from" address for outgoing email. |
-| `COMPANY_NAME` | Name shown in email templates. |
+| `EMAIL_FROM` | Verified "from" address for outgoing email; `Brand <no-reply@example.com>` sets the display name. |
 
 Everything else like social providers, email OTP, fraud checks, Sentry, cookie/CORS tuning etc. are **optional**
 and activates only when its env vars are present.
@@ -166,8 +165,41 @@ GitHub pull requests also run:
 - `src/index.ts` - app bootstrap, CORS, mounts Better-Auth and internal routes.
 - `src/auth.ts` - Better-Auth configuration, plugins, hooks, drizzle adapter, email callbacks.
 - `src/lib/email.ts` - Email delivery via Resend (verification, password reset, OTP, email change).
+- `src/lib/email-templates.ts` + `templates/email/` - Handlebars template loader and the default email templates.
 - `src/db/schema.ts` - Drizzle schema and indices.
 - `src/routes/users.route.ts` - Basic-Auth protected internal user lookup (`GET /api/users/id/:id`, `POST /api/users/email`), defined with `@hono/zod-openapi` so it self-documents (its schema is served at `/api/users/openapi.json` and surfaced as a source in the unified `/api/docs` reference).
+
+### Customizing email templates
+
+Emails are rendered from [Handlebars](https://handlebarsjs.com) files in `templates/email/`, so each deployment can brand them without touching code.
+Set `EMAIL_TEMPLATES_DIR` to a directory of your own (in Docker, mount it as a volume and point the variable at the mounted path).
+Brand name, colors and copy live in the templates, not in env vars. A file missing from that directory falls back to the built-in one, so overriding only `layout.hbs` is enough to rebrand the shared shell.
+
+| File | Purpose |
+| :--- | :--- |
+| `layout.hbs` | Shared HTML shell (branding, header, footer). Renders the `body` and `footer` blocks of each email. |
+| `verification.hbs` | Sign-up email verification. |
+| `password-reset.hbs` | Password reset link. |
+| `otp.hbs` | One-time code, for all OTP types (branch on `otpType`). |
+| `change-email-confirmation.hbs` | Approval link sent to the current address. |
+| `change-email-verification.hbs` | Confirmation link sent to the new address. |
+| `subjects.json` | Subject line per email (Handlebars strings), merged per key with the defaults. |
+
+Each email file wraps the layout and fills its blocks:
+
+```handlebars
+{{#> layout}}
+	{{#*inline "body"}}<p>Hello {{name}},</p>{{/inline}}
+	{{#*inline "footer"}}Ignore this email if it wasn't you.{{/inline}}
+{{/layout}}
+```
+
+Available variables: `subject`, `expiresIn` (human readable), `name`, `url` (the action link), `email`, `newEmail`, `otp` and `otpType` (`sign-in`, `email-verification`, `forget-password` or `change-email`).
+Which of them are set depends on the email. The `eq` helper compares values, e.g. `{{#if (eq otpType "sign-in")}}`.
+`{{value}}` is HTML-escaped; avoid `{{{value}}}` for anything user-supplied.
+
+Templates are compiled and checked at startup (syntax, required variables such as the action link or the OTP code, no unescaped `{{{ }}}` output), so a broken design stops the boot with a clear message instead of failing on a user's request. The full contract is in `templates/email/README.md`.
+Changes need a restart.
 
 ### Security & operations
 

@@ -1,0 +1,17 @@
+{{#> layout}}
+	{{#*inline "body"}}
+		<p>Hello {{name}},</p>
+		<p>Thank you for signing up. To complete your registration and secure your account, please verify your email address.</p>
+		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 10px; margin-bottom: 10px;">
+			<tr>
+				<td align="left">
+					<a href="{{url}}" style="background-color: #2d5a2d; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid #2d5a2d;">Verify Email Address</a>
+				</td>
+			</tr>
+		</table>
+		<p style="font-size: 14px; color: #71717a;">This link will expire in {{expiresIn}}.</p>
+	{{/inline}}
+	{{#*inline "footer"}}
+		If you didn't create an account with us, you can safely ignore this email.
+	{{/inline}}
+{{/layout}}
