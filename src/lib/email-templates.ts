@@ -26,10 +26,30 @@ export const EMAIL_KINDS = [
 ] as const;
 export type EmailKind = (typeof EMAIL_KINDS)[number];
 
+/**
+ * How long a link or code is valid, as numbers only (e.g. 4830s is 1, 20, 30). Zero parts are 0.
+ * Templates write the unit words, so any language works.
+ */
+export interface ExpiresIn {
+	hours: number;
+	minutes: number;
+	seconds: number;
+}
+
+/** Splits a duration in seconds into whole hours, minutes and seconds. */
+export function toExpiresIn(seconds: number): ExpiresIn {
+	// Config validation keeps expirations positive; guard anyway so a bad value can't print NaN.
+	const total = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0;
+	return {
+		hours: Math.floor(total / 3600),
+		minutes: Math.floor((total % 3600) / 60),
+		seconds: total % 60,
+	};
+}
+
 /** Variables available to every template and subject. Optional ones depend on the email kind. */
 export interface EmailTemplateData {
-	expiresIn: string;
-	expiresInDe: string;
+	expiresIn: ExpiresIn;
 	name?: string;
 	url?: string;
 	email?: string;
@@ -58,13 +78,15 @@ const REQUIRED_VARIABLES: Record<string, (keyof EmailTemplateData)[]> = {
 };
 
 // Unique, escape-safe values, so each variable can be found in the rendered output.
+// The expiry parts are numbers no design would contain, so finding one proves the template printed it
+// (a realistic value like 1 would also match "1px" or "#f1f1f1"). All non-zero, so every {{#if}} part renders.
 const SENTINEL_URL = "https://example.invalid/SENTINEL_url";
+const SENTINEL_EXPIRES_IN: ExpiresIn = { hours: 7_310_421, minutes: 7_310_422, seconds: 7_310_423 };
 function sentinelData(otpType?: OtpType): EmailTemplateData {
 	return {
 		name: "SENTINEL_name",
 		url: SENTINEL_URL,
-		expiresIn: "SENTINEL_expiresIn",
-		expiresInDe: "SENTINEL_expiresInDe",
+		expiresIn: SENTINEL_EXPIRES_IN,
 		email: "SENTINEL_email",
 		newEmail: "SENTINEL_newEmail",
 		otp: "SENTINEL_otp",
@@ -164,9 +186,10 @@ export function createEmailRenderer(customDir?: string): EmailRenderer {
 		}
 	}
 
-	// Isolated instance so the registered partial and helper never leak to other Handlebars users.
+	// Isolated instance so the registered partial and helpers never leak to other Handlebars users.
 	const hbs = Handlebars.create();
-	hbs.registerHelper("eq", (a: string, b: string) => a === b);
+	// Compares strings ({{#if (eq otpType "sign-in")}}) and numbers ({{#if (eq expiresIn.hours 1)}}).
+	hbs.registerHelper("eq", (a: string | number, b: string | number) => a === b);
 	hbs.registerPartial("layout", layoutSource);
 
 	const subjectSources = loadTemplateConfig(customRoot).subjects;
@@ -203,10 +226,17 @@ export function createEmailRenderer(customDir?: string): EmailRenderer {
 		const data = sentinelData(otpType);
 		for (const variable of REQUIRED_VARIABLES[file] ?? []) {
 			// The action link must be the href of a link or button, not just text.
-			const expected = variable === "url" ? `href="${SENTINEL_URL}"` : String(data[variable]);
-			if (!html.includes(expected)) {
+			// The expiry counts as printed when any of its parts is.
+			const expected =
+				variable === "url"
+					? [`href="${SENTINEL_URL}"`]
+					: variable === "expiresIn"
+						? Object.values(SENTINEL_EXPIRES_IN).map(String)
+						: [String(data[variable])];
+			if (!expected.some((value) => html.includes(value))) {
 				const where = variable === "url" ? 'as the href="{{url}}" of the button' : "in the body";
-				throw new Error(`${file}.hbs must print {{${variable}}} ${where} (checked for "${kind}")`);
+				const name = variable === "expiresIn" ? "expiresIn.hours/minutes/seconds" : variable;
+				throw new Error(`${file}.hbs must print {{${name}}} ${where} (checked for "${kind}")`);
 			}
 		}
 	}

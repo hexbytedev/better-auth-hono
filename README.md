@@ -241,8 +241,9 @@ Each email file wraps the layout and fills two blocks:
 {{/layout}}
 ```
 
-- Variables: `subject`, `name`, `url` (the action link), `expiresIn` (e.g. `1 hour`), `expiresInDe` (the same in German), `email`, `newEmail`, `otp` and `otpType`. Which ones are set depends on the email.
+- Variables: `subject`, `name`, `url` (the action link), `expiresIn.hours` / `expiresIn.minutes` / `expiresIn.seconds` (the expiry as numbers, e.g. `1`, `20`, `30`), `email`, `newEmail`, `otp` and `otpType`. Which ones are set depends on the email.
 - Compare values with the `eq` helper: `{{#if (eq otpType "sign-in")}}`.
+- The expiry is numbers only, so the template writes the units ("hour", "Stunde", ...) in its own language. Copy the pattern from "Writing the expiry time" in `templates/email/README.md`.
 - `{{value}}` escapes HTML. Never use `{{{value}}}`: the server rejects it.
 
 The server checks every template at startup: syntax, required variables (such as the action link or the OTP code), and no `{{{ }}}`. A broken design stops the server with a clear error, instead of failing when a user needs the email. Full rules: `templates/email/README.md`.

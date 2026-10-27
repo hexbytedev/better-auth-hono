@@ -53,8 +53,7 @@ Always use double braces, e.g. `{{name}}`. Every value is HTML-escaped.
 | `{{subject}}` | The rendered subject line | every email (use it in `layout.hbs`) |
 | `{{name}}` | The user's name, or empty. Greet with `{{#if name}}Hello {{name}},{{else}}Hello,{{/if}}` | verification, password-reset, both change-email |
 | `{{url}}` | The action link (verify, reset, approve, confirm) | verification, password-reset, both change-email |
-| `{{expiresIn}}` | How long the link or code is valid, in English, e.g. `1 hour`, `5 minutes` | every email |
-| `{{expiresInDe}}` | The same in German, e.g. `1 Stunde`, `5 Minuten`, for bilingual designs | every email |
+| `{{expiresIn.hours}}` `{{expiresIn.minutes}}` `{{expiresIn.seconds}}` | How long the link or code is valid, as three numbers. You write the units: see "Writing the expiry time" | every email |
 | `{{email}}` | The **new** address being confirmed | change-email-verification |
 | `{{newEmail}}` | The address the user wants to switch to | change-email-confirmation |
 | `{{otp}}` | The one-time code | otp |
@@ -64,6 +63,49 @@ Always use double braces, e.g. `{{name}}`. Every value is HTML-escaped.
 - There are **no brand variables**. Write the company name, colors, logo and links directly into the templates.
 - Don't invent variables. The server won't fill them.
 
+## Writing the expiry time
+
+The server sends the expiry as **numbers only**, never as words. Your template writes the units, so the email can be in any language.
+
+| Configured expiry | `expiresIn.hours` | `expiresIn.minutes` | `expiresIn.seconds` |
+| :--- | :--- | :--- | :--- |
+| 30 seconds | 0 | 0 | 30 |
+| 5 minutes (OTP default) | 0 | 5 | 0 |
+| 1 hour (link default) | 1 | 0 | 0 |
+| 4830 seconds | 1 | 20 | 30 |
+
+- The three numbers together are the exact time. Nothing is rounded, and any of them can be `0`.
+- At least one of them is always above `0`, because the server only accepts positive expiry settings.
+- Hours don't roll over into days: 25 hours is `25`, `0`, `0`.
+
+### The pattern
+
+Print each part only when it isn't `0`, using `{{#if}}`. Choose singular or plural with `eq`. This is the line the default templates use:
+
+```handlebars
+This link will expire in{{#if expiresIn.hours}} {{expiresIn.hours}} {{#if (eq expiresIn.hours 1)}}hour{{else}}hours{{/if}}{{/if}}{{#if expiresIn.minutes}} {{expiresIn.minutes}} {{#if (eq expiresIn.minutes 1)}}minute{{else}}minutes{{/if}}{{/if}}{{#if expiresIn.seconds}} {{expiresIn.seconds}} {{#if (eq expiresIn.seconds 1)}}second{{else}}seconds{{/if}}{{/if}}.
+```
+
+It prints `1 hour`, `5 minutes` or `1 hour 20 minutes 30 seconds`.
+
+- **Keep it on one line.** Each part starts with its own space, so write `in{{#if` with no space before it. A line break inside the sentence would add extra spaces to the email.
+- **Keep all three parts**, even if your current settings never use seconds. The expiry settings can change without anyone touching the templates.
+- `{{expiresIn}}` on its own prints nothing useful. Always use `.hours`, `.minutes` and `.seconds`.
+
+### Another language
+
+Copy the pattern and change only the words. German, for example:
+
+```handlebars
+Dieser Link ist{{#if expiresIn.hours}} {{expiresIn.hours}} {{#if (eq expiresIn.hours 1)}}Stunde{{else}}Stunden{{/if}}{{/if}}{{#if expiresIn.minutes}} {{expiresIn.minutes}} {{#if (eq expiresIn.minutes 1)}}Minute{{else}}Minuten{{/if}}{{/if}}{{#if expiresIn.seconds}} {{expiresIn.seconds}} {{#if (eq expiresIn.seconds 1)}}Sekunde{{else}}Sekunden{{/if}}{{/if}} gültig.
+```
+
+It prints `Dieser Link ist 1 Stunde gültig` or `Dieser Link ist 5 Minuten gültig`. A bilingual email simply has both sentences.
+
+### Upgrading an older custom template
+
+Older versions sent ready-made text in `{{expiresIn}}` (English) and `{{expiresInDe}}` (German). Both are gone. Replace each of them with the pattern above in the matching language. Until you do, the server stops at startup with `must print {{expiresIn.hours/minutes/seconds}}`.
+
 ## Required in each file
 
 Checked at startup, unless marked "not checked".
@@ -71,11 +113,13 @@ Checked at startup, unless marked "not checked".
 | File | Must contain | Optional |
 | :--- | :--- | :--- |
 | `layout.hbs` | `{{> body}}` once, `{{> footer}}` once | `{{subject}}` in `<title>` and as the heading (recommended, not checked) |
-| `verification.hbs` | `href="{{url}}"`, `{{expiresIn}}` | `{{name}}` |
-| `password-reset.hbs` | `href="{{url}}"`, `{{expiresIn}}` | `{{name}}` |
-| `change-email-verification.hbs` | `href="{{url}}"`, `{{email}}`, `{{expiresIn}}` | `{{name}}` |
-| `change-email-confirmation.hbs` | `href="{{url}}"`, `{{newEmail}}`, `{{expiresIn}}` | `{{name}}` |
-| `otp.hbs` | `{{otp}}`, `{{expiresIn}}` | all four `{{otpType}}` branches (keep them, not checked) |
+| `verification.hbs` | `href="{{url}}"`, the expiry | `{{name}}` |
+| `password-reset.hbs` | `href="{{url}}"`, the expiry | `{{name}}` |
+| `change-email-verification.hbs` | `href="{{url}}"`, `{{email}}`, the expiry | `{{name}}` |
+| `change-email-confirmation.hbs` | `href="{{url}}"`, `{{newEmail}}`, the expiry | `{{name}}` |
+| `otp.hbs` | `{{otp}}`, the expiry | all four `{{otpType}}` branches (keep them, not checked) |
+
+**"The expiry"** means at least one of `{{expiresIn.hours}}`, `{{expiresIn.minutes}}` or `{{expiresIn.seconds}}`. The check can't tell whether you kept all three, so use the full pattern from "Writing the expiry time".
 
 **`href="{{url}}"` means exactly that:** `{{url}}` must be the whole `href` value of an `<a>` tag. Printing it as plain text fails the check. Showing it again as text under the button is fine, and recommended.
 
@@ -132,7 +176,7 @@ Every email file (all except `layout.hbs` and `config.json`) wraps the layout an
   {{#*inline "body"}}
     <p>Hello {{name}},</p>
     <a href="{{url}}" style="...">Button text</a>
-    <p>This link will expire in {{expiresIn}}.</p>
+    <p>This link will expire in ...</p> {{!-- the expiry pattern from "Writing the expiry time" --}}
   {{/inline}}
   {{#*inline "footer"}}
     If you didn't request this, you can ignore this email.
@@ -145,7 +189,7 @@ Every email file (all except `layout.hbs` and `config.json`) wraps the layout an
 ## Hard rules
 
 1. **Double braces only.** `{{{value}}}` and `{{&value}}` turn off HTML escaping, so a user's name could inject markup. The server rejects them.
-2. **`eq` is the only helper**, as in `(eq otpType "sign-in")`. The only partials are `layout`, `body` and `footer`.
+2. **`eq` is the only helper**, as in `(eq otpType "sign-in")` or `(eq expiresIn.hours 1)`. The only partials are `layout`, `body` and `footer`.
 3. **Email-safe HTML.** Tables for layout and inline `style` attributes. No external CSS, JavaScript or web fonts. Keep the `<!--[if mso]>` blocks if you support Outlook.
 4. **Images use absolute `https://` URLs** on your own host. No relative paths, `cid:` or `data:`.
 5. **Never replace `{{url}}` with a fixed link.** Each link is unique to the user and the request.
@@ -155,7 +199,7 @@ Every email file (all except `layout.hbs` and `config.json`) wraps the layout an
 
 1. Keep every file name and every subject key in `config.json`.
 2. Rewrite `layout.hbs`. Keep `{{subject}}`, `{{> body}}` and `{{> footer}}`.
-3. Rewrite each email file. Keep its required items and the `body` and `footer` blocks.
+3. Rewrite each email file. Keep its required items and the `body` and `footer` blocks. Use the full expiry pattern, in every language the email has.
 4. In `otp.hbs`, keep `{{otp}}` and all four `otpType` branches.
 5. If the brand changes, update `fromName` and the subjects in `config.json`.
 6. Restart the server. If it stops, the error names the file and the missing variable.
