@@ -65,7 +65,9 @@ A custom Basic-Auth-protected lookup API: `GET /api/users/id/:id` and `POST /api
 
 ### Email (`src/lib/email.ts`)
 
-All transactional email goes through Resend. The `Resend` client is constructed lazily in `getResend()` (not at module load) so the module can import before `checkEnv()` validates `RESEND_API_KEY`. All user-supplied values are HTML-escaped before templating.
+All transactional email goes through Resend. The `Resend` client is constructed lazily in `getResend()` (not at module load) so the module can import before `checkEnv()` validates `RESEND_API_KEY`.
+
+HTML and subjects come from Handlebars files via `src/lib/email-templates.ts`. Defaults live in `templates/email/` (copied into the Docker image); `EMAIL_TEMPLATES_DIR` points at a per-project directory that is searched first, falling back per file to the defaults. Templates are compiled and validated at module load (syntax, required variables per email, `{{{ }}}` rejected, layout must render `body` and `footer`), so a broken template fails the boot. The template contract for design swaps is `templates/email/README.md`. `{{value}}` escapes HTML automatically, so do not use `{{{value}}}` for user-supplied values. Adding an email means a new kind in `EMAIL_KINDS`, a subject in `config.json`, a `.hbs` file, and a `send...` function in `email.ts` calling `sendTemplatedEmail`.
 
 ### Config & redaction
 

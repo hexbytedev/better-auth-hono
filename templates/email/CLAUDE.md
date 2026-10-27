@@ -1,0 +1,3 @@
+# Email templates
+
+@README.md

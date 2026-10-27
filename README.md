@@ -1,45 +1,49 @@
-# Better-Auth Hono - Production-ready Auth Server
+# Better-Auth Hono: production-ready auth server
 
 > [!TIP]
-> **Live demo: no deployment required.** Try the full login process at **[authtry.hexbyte.dev](https://authtry.hexbyte.dev)**.
+> **Live demo, nothing to deploy.** Try the full login flow at **[authtry.hexbyte.dev](https://authtry.hexbyte.dev)**.
 
-This repository packages Better-Auth into a focused, deployable Docker image that delivers a complete authentication service (passkeys, TOTP, JWTs, social OAuth, email/password, email OTP, and an internal lookup API) with pragmatic operational defaults applied.
+A ready-to-deploy Docker image of Better-Auth, wrapped in Hono. It includes passkeys, TOTP, JWTs, Google and GitHub sign-in, email and password, email OTP, and an internal user lookup API.
 
 ## Why this project
 
-- Provides ready-to-run Docker images that are easy to deploy and configure via `.env.local`.
-- Environment-first validation, Sentry integration, sensible CORS/cookie settings, and schema/indexing tuned for Postgres.
-- Keeps Better-Auth itself unchanged - improvements live around the integration surface for safety and portability.
+- Ready-to-run Docker image, configured with one `.env.local` file.
+- Checks the env at startup, reports errors to Sentry, and ships safe CORS and cookie defaults plus a Postgres schema with tuned indexes.
+- Better-Auth itself is not modified. All custom code lives around it, so upgrades stay easy.
 
 ## What you get
 
-- Runtime and migration Docker images, runnable on any container platform (see `Dockerfile` and `docker-compose.yml`).
-- Drizzle ORM schema with UUID primary keys and indices optimized for fast lookups (see `src/db/schema.ts`).
-- JWT support for microservices (`src/auth.ts`) and an internal Basic-Auth protected user lookup API (`GET /api/users/id/:id`, `POST /api/users/email`).
-- Email OTP authentication: sign-in, email verification, and password reset via one-time codes.
-- Sign up fraud protection: when `FRAUD_CHECK_API_URL` is configured, each registration's email must be explicitly allowed by the [DeGhost fraud detection API](https://deghost.hexbyte.dev) (API endpoint: <https://deghostapi.hexbyte.dev>) or the signup is blocked (fail-closed); the client IP is additionally screened for disposable/abusive sources and threat signals. Optionally, sign-ups from public/free email providers (gmail.com, etc.) can be rejected via `BLOCK_PUBLIC_DOMAIN_SIGNUP`, which is handy for B2B apps that only accept organization email.
+- One Docker image for the server and the schema setup (`Dockerfile`, `docker-compose.yml`).
+- Drizzle schema with UUID primary keys and indexes for fast lookups (`src/db/schema.ts`).
+- JWTs for your microservices (`src/auth.ts`).
+- An internal user lookup API behind Basic Auth: `GET /api/users/id/:id` and `POST /api/users/email`.
+- Email OTP: sign in, verify an email, or reset a password with a one-time code.
+- Sign-up fraud protection (optional, set `FRAUD_CHECK_API_URL`):
+  - The [DeGhost fraud detection API](https://deghost.hexbyte.dev) (endpoint <https://deghostapi.hexbyte.dev>) must allow the email, or the sign-up is blocked.
+  - The client IP is checked for disposable or abusive sources.
+  - With `BLOCK_PUBLIC_DOMAIN_SIGNUP=true`, sign-ups from free providers such as gmail.com are rejected. Useful for B2B apps.
 
-## Features at a Glance
+## Features at a glance
 
 | Feature | Description | Included |
 | :--- | :--- | :---: |
-| **Passkeys** | Modern WebAuthn/Biometric authentication | ✅ |
-| **Two-Factor (2FA)** | Multi-factor authentication via TOTP | ✅ |
-| **Social OAuth** | Login via Google and GitHub providers | ✅ |
-| **Email & Password** | Traditional credentials with verification & reset | ✅ |
-| **Email OTP** | Sign-in, verification, and password reset via one-time codes | ✅ |
-| **JWT Support** | Stateless tokens for microservice authentication | ✅ |
-| **Internal User API** | **Custom** Basic-Auth protected lookup by ID and email | ✅ |
-| **Signup Protection** | **Custom** Fraud checks for email, IP, and public-domain policy | ✅ |
-| **OpenAPI/Swagger** | Automated API documentation and reference | ✅ |
-| **Docker Support** | Optimized production-ready container images | ✅ |
-| **Database ORM** | Drizzle with UUID v7 and optimized indexing | ✅ |
-| **Sentry Monitoring** | Structured error tracking and performance metrics | ✅ |
-| **Code Quality** | Biome linting/formatting and Husky git hooks | ✅ |
+| **Passkeys** | WebAuthn and biometric sign-in | ✅ |
+| **Two-Factor (2FA)** | TOTP codes from an authenticator app | ✅ |
+| **Social OAuth** | Sign in with Google or GitHub | ✅ |
+| **Email & Password** | Classic login with email verification and password reset | ✅ |
+| **Email OTP** | Sign-in, verification and password reset with one-time codes | ✅ |
+| **JWT Support** | Stateless tokens for microservices | ✅ |
+| **Internal User API** | **Custom** lookup by ID or email, behind Basic Auth | ✅ |
+| **Signup Protection** | **Custom** fraud checks on email, IP and public domains | ✅ |
+| **OpenAPI/Swagger** | Generated API reference | ✅ |
+| **Docker Support** | Production-ready container image | ✅ |
+| **Database ORM** | Drizzle with UUID v7 and tuned indexes | ✅ |
+| **Sentry Monitoring** | Error tracking and performance metrics | ✅ |
+| **Code Quality** | Biome linting and formatting, Husky git hooks | ✅ |
 
-## Better Auth Plugins in Use
+## Better Auth plugins in use
 
-| Plugin | Import | Configurable |
+| Plugin | Import | Enabled |
 | :--- | :--- | :---: |
 | **Expo** | `@better-auth/expo` | Always |
 | **Email OTP** | `better-auth/plugins` | `EMAIL_OTP_ENABLED` |
@@ -50,69 +54,112 @@ This repository packages Better-Auth into a focused, deployable Docker image tha
 
 ## Deploy with Docker
 
-A single prebuilt image `ghcr.io/hexbytedev/better-auth-hono:<version>` both serves the app and sets up the database schema. Choose the mode via the container command:
+One image, `ghcr.io/hexbytedev/better-auth-hono:<version>`, runs the server and sets up the database. The container command picks the mode:
 
-- **no command** (or `app`) → starts the auth server (default).
-- `push` → syncs `src/db/schema.ts` into the database, then exits. Run it once per deploy/upgrade (the compose file does this for you).
+- No command (or `app`): start the auth server.
+- `push`: sync `src/db/schema.ts` to the database, then exit. Run it on every deploy or upgrade.
 
-To set up (or update) the schema as a one-shot job:
+To run the schema setup on its own:
 
 ```bash
 docker run --rm --env-file .env.local ghcr.io/hexbytedev/better-auth-hono:<version> push
 ```
 
-On a new/empty database this applies the whole schema and exits cleanly. When `push` meets a change it will not apply automatically
-(e.g. a destructive change against existing data) it **prompts for confirmation**, which needs an interactive terminal. Run it from inside a running container instead:
+On an empty database, `push` creates the whole schema and exits. If a change could affect existing data, `push` asks for confirmation, which needs an interactive terminal. In that case, run it inside the running container:
 
 ```bash
-# open a shell in the running app container (its name from docker-compose.yml is better-auth-hono)
+# Open a shell in the app container (named better-auth-hono in docker-compose.yml)
 sudo docker exec -it better-auth-hono /bin/sh
 
-# then, inside the container, run push and answer its prompts:
+# Inside the container, run push and answer its prompts
 bun run push
 ```
 
-The container already has `DATABASE_URL` (from the compose `env_file`), `drizzle-kit`, and the schema, so `push` connects and prompts right there.
+The container already has `DATABASE_URL`, `drizzle-kit` and the schema, so nothing else is needed.
 
-### 1. Provision dependencies
+### 1. Prepare the services
 
-- A **PostgreSQL** database (its connection string becomes `DATABASE_URL`).
-- A **Resend** account with a verified sender domain (for transactional email).
+- A **PostgreSQL** database. Its connection string is `DATABASE_URL`.
+- A **Resend** account with a verified sender domain, for sending email.
 
 ### 2. Configure the environment
 
-Copy `.env.sample` to `.env.local` and fill it in. Every variable is documented inline in `.env.sample`, and the server validates them at boot.
-It **fails fast and lists everything missing** if a required variable is absent, so a bad config never starts silently.
+Copy `.env.sample` to `.env.local` and fill it in. Each variable is explained in `.env.sample`.
+At startup, the server lists every missing required variable and refuses to start.
 
 Required in every deployment:
 
 | Variable | Purpose |
 | :--- | :--- |
-| `BETTER_AUTH_SERVER_URL` | Public base URL of this auth server (OAuth callbacks, JWT issuer). |
-| `BETTER_AUTH_SECRET` | Signing/encryption secret generated with `openssl rand -base64 32`. |
-| `BETTER_AUTH_RP_ID` | WebAuthn relying-party ID: domain without scheme (e.g. `client-frontend.example.com`, or `localhost` in dev). |
-| `BETTER_AUTH_RP_NAME` | Human-readable app name shown in passkey prompts. |
-| `CLIENT_URL` | Frontend URL used as a CORS origin and the JWT audience. |
+| `BETTER_AUTH_SERVER_URL` | Public URL of this auth server. Used for OAuth callbacks and as the JWT issuer. |
+| `BETTER_AUTH_SECRET` | Secret for signing and encryption. Generate it with `openssl rand -base64 32`. |
+| `BETTER_AUTH_RP_ID` | Passkey domain, without `https://` (e.g. `client-frontend.example.com`, or `localhost` in dev). |
+| `BETTER_AUTH_RP_NAME` | App name shown in passkey prompts. |
+| `CLIENT_URL` | Frontend URL. Allowed by CORS and used as the JWT audience. |
 | `DATABASE_URL` | PostgreSQL connection string. |
-| `RESEND_API_KEY` | Resend API key for sending email. |
-| `EMAIL_FROM` | Verified "from" address for outgoing email. |
-| `COMPANY_NAME` | Name shown in email templates. |
+| `RESEND_API_KEY` | Resend API key. |
+| `EMAIL_FROM` | Verified sender address, e.g. `no-reply@example.com`. The display name comes from `fromName` in the templates' `config.json`. |
 
-Everything else like social providers, email OTP, fraud checks, Sentry, cookie/CORS tuning etc. are **optional**
-and activates only when its env vars are present.
+Everything else (social sign-in, email OTP, fraud checks, Sentry, cookie and CORS settings) is optional. Each feature turns on only when its env vars are set.
 
-### 3. Set up the schema, then start
+### 3. Set up the schema and start
 
-With the provided `docker-compose.yml` the ordering is handled for you: the schema-setup service (the same image invoked with the `push` command)
-runs to completion (`service_completed_successfully`) before the app starts. Update the image tags to the version you want, then:
+With the provided `docker-compose.yml`, a `push` service sets up the schema first, and the app starts only after it succeeds. Set the image tags to the version you want, then run:
 
 ```bash
 docker compose up
 ```
 
-Once running, `GET /api/health` returns `{ "status": "ok", ... }` for load-balancer / container health checks.
-A single interactive API reference is served at `/api/docs` (Scalar): it always lists all Better-Auth endpoints (auto-generated by the `openAPI()` plugin),
-and when the internal user API is enabled, it adds the Basic-Auth lookup API as a second source.
+- `GET /api/health` returns `{ "status": "ok", ... }` for health checks.
+- `/api/docs` is the API reference (Scalar). It lists every Better-Auth endpoint, plus the internal user API when it is enabled.
+
+### 4. (Optional) Use your own email templates
+
+The image ships English templates in `/app/templates/email`. To use your own design, mount a folder. You edit the files on the server and restart, with no image rebuild.
+
+1. Create the folder next to `docker-compose.yml`. To start from the built-in templates, copy them out of the image once:
+
+   ```bash
+   docker create --name tpl-seed ghcr.io/hexbytedev/better-auth-hono:<version>
+   docker cp tpl-seed:/app/templates/email ./email-templates
+   docker rm tpl-seed
+   ```
+
+   Or unzip a design you were given into `./email-templates`. Editing rules: `templates/email/README.md`. Any file missing from the folder uses the built-in version.
+
+2. Mount the folder on the `better-auth-hono` service in `docker-compose.yml` (the lines are already there, commented out):
+
+   ```yaml
+   volumes:
+     - ./email-templates:/app/email-templates:ro
+   ```
+
+3. Set the path inside the container in `.env.local`:
+
+   ```bash
+   EMAIL_TEMPLATES_DIR=/app/email-templates
+   ```
+
+4. Let the container user (non-root `bun`) read the folder: `chmod -R a+rX ./email-templates`.
+5. Start: `docker compose up -d --force-recreate better-auth-hono`.
+
+**Edit a template later.** Change the files in `./email-templates`, then run `docker compose restart better-auth-hono`. Templates load only at startup, so always restart. If an edit breaks a template, the container won't start and keeps retrying (`restart: unless-stopped`). Run `docker logs better-auth-hono` to see why, fix the file, and restart.
+
+**Change the path.** `EMAIL_TEMPLATES_DIR` is a path inside the container, not on your server. In `host-path:container-path`:
+
+- The left part is where the folder lives on your server, e.g. `/srv/mysite/email-templates`.
+- The right part must equal `EMAIL_TEMPLATES_DIR`, as an absolute path.
+
+**Check that it worked.** The startup log says which templates loaded:
+
+```text
+[EMAIL] Using templates from /app/email-templates, overriding: layout.hbs, verification.hbs, config.json
+```
+
+- `[EMAIL] Using the built-in email templates`: `EMAIL_TEMPLATES_DIR` is not set.
+- `[EMAIL] EMAIL_TEMPLATES_DIR (...) contains no template files`: the folder is empty, or the mount path doesn't match `EMAIL_TEMPLATES_DIR`.
+- `EMAIL_TEMPLATES_DIR is not a directory`: the path doesn't exist in the container. The server stops.
+- An error naming a file and a `{{variable}}`: a template breaks the rules. The server stops. See `templates/email/README.md`.
 
 ## For developers
 
@@ -131,30 +178,27 @@ and when the internal user API is enabled, it adds the Basic-Auth lookup API as 
 - `bun run test`
 - `bun test src/index.smoke.test.ts`
 
-### Database / migrations
+### Database
 
-Scripts are run with **Bun** (this repo has no `yarn`/`db:*` scripts):
+All scripts run with **Bun**.
 
-- `bun run push`: syncs `src/db/schema.ts` straight into the database. This is how the schema is set up and updated (including on a fresh database).
-  It prompts before a change it will not apply automatically (e.g. one that risks existing data), so it needs a TTY.
-- `bun run generate`: optionally record the change as versioned SQL in `drizzle/` for review/history.
-- `drizzle.config.ts` loads `.env.local`, so Drizzle commands use that file for `DATABASE_URL`.
+- `bun run push`: sync `src/db/schema.ts` to the database. Use it to set up a fresh database and to apply every schema change. It asks before risky changes, so it needs a terminal (TTY).
+- `bun run generate`: optional. Saves the change as versioned SQL in `drizzle/` for review and history.
+- Drizzle commands read `DATABASE_URL` from `.env.local` (see `drizzle.config.ts`).
 
-Typical schema change: edit `src/db/schema.ts` → `bun run generate` → `bun run push` (answer any prompts).
+Typical schema change: edit `src/db/schema.ts`, run `bun run generate`, then `bun run push` and answer any prompts.
 
 ### Code quality
 
-This project uses Husky for Git hooks to ensure code quality:
+A Husky pre-commit hook runs `bun run lint`.
 
-- **Pre-commit hook**: Runs `bun run lint` before each commit.
+Manual commands:
 
-To manually run linting and formatting:
+- `bun run lint`: lint and auto-fix
+- `bun run lint:check`: lint without changing files
+- `bun run format`: format code
 
-- `bun run lint` - Lint and auto-fix issues
-- `bun run lint:check` - Check for issues without fixing
-- `bun run format` - Format code
-
-GitHub pull requests also run:
+Pull requests also run:
 
 - `bun run lint:check`
 - `bun run build`
@@ -163,38 +207,84 @@ GitHub pull requests also run:
 
 ### Key files
 
-- `src/index.ts` - app bootstrap, CORS, mounts Better-Auth and internal routes.
-- `src/auth.ts` - Better-Auth configuration, plugins, hooks, drizzle adapter, email callbacks.
-- `src/lib/email.ts` - Email delivery via Resend (verification, password reset, OTP, email change).
-- `src/db/schema.ts` - Drizzle schema and indices.
-- `src/routes/users.route.ts` - Basic-Auth protected internal user lookup (`GET /api/users/id/:id`, `POST /api/users/email`), defined with `@hono/zod-openapi` so it self-documents (its schema is served at `/api/users/openapi.json` and surfaced as a source in the unified `/api/docs` reference).
+- `src/index.ts`: app startup, CORS, mounts Better-Auth and the internal routes.
+- `src/auth.ts`: Better-Auth config (plugins, hooks, database adapter, email callbacks).
+- `src/lib/email.ts`: sends email through Resend (verification, password reset, OTP, email change).
+- `src/lib/email-templates.ts`: loads and checks the Handlebars templates. The defaults live in `templates/email/`.
+- `src/db/schema.ts`: Drizzle schema and indexes.
+- `src/routes/users.route.ts`: internal user lookup behind Basic Auth. Built with `@hono/zod-openapi`, so its docs come from the code (`/api/users/openapi.json`, also shown in `/api/docs`).
+
+### Customizing email templates
+
+Emails are [Handlebars](https://handlebarsjs.com) files in `templates/email/`. Each deployment can brand them without code changes.
+
+- Point `EMAIL_TEMPLATES_DIR` at your own folder (for Docker, see step 4 above).
+- Brand name, colors and copy go in the templates, not in env vars.
+- A file missing from your folder uses the built-in one. Overriding only `layout.hbs` is enough to rebrand every email.
+
+| File | Purpose |
+| :--- | :--- |
+| `layout.hbs` | Shared HTML shell (branding, header, footer). Renders each email's `body` and `footer` blocks. |
+| `verification.hbs` | Sign-up email verification. |
+| `password-reset.hbs` | Password reset link. |
+| `otp.hbs` | One-time code for every OTP type (branch on `otpType`). |
+| `change-email-confirmation.hbs` | Approval link sent to the current address. |
+| `change-email-verification.hbs` | Confirmation link sent to the new address. |
+| `config.json` | Sender name (`fromName`) and one subject per email (`subjects`). Merged key by key with the defaults. |
+
+Each email file wraps the layout and fills two blocks:
+
+```handlebars
+{{#> layout}}
+  {{#*inline "body"}}<p>Hello {{name}},</p>{{/inline}}
+  {{#*inline "footer"}}Ignore this email if it wasn't you.{{/inline}}
+{{/layout}}
+```
+
+- Variables: `subject`, `name`, `url` (the action link), `expiresIn` (e.g. `1 hour`), `expiresInDe` (the same in German), `email`, `newEmail`, `otp` and `otpType`. Which ones are set depends on the email.
+- Compare values with the `eq` helper: `{{#if (eq otpType "sign-in")}}`.
+- `{{value}}` escapes HTML. Never use `{{{value}}}`: the server rejects it.
+
+The server checks every template at startup: syntax, required variables (such as the action link or the OTP code), and no `{{{ }}}`. A broken design stops the server with a clear error, instead of failing when a user needs the email. Full rules: `templates/email/README.md`.
+
+To try a design locally, set `EMAIL_TEMPLATES_DIR=./my-templates`. Restart after every change.
 
 ### Security & operations
 
-- Fail-fast env validation prevents accidental misconfiguration.
-- Sentry captures structured errors with tags for faster triage.
-- Sign up fraud screening runs only when `FRAUD_CHECK_API_URL` is set (the [DeGhost fraud detection API](https://deghost.hexbyte.dev), endpoint <https://deghostapi.hexbyte.dev>). It is **fail-closed on the email**: the remote must explicitly allow the email (HTTP 200) or the signup is blocked, including when the API is unreachable or returns an error. The client IP is a secondary signal (proxy/VPN and threat checks) that blocks only on an explicit threat verdict.
-- Fraud screening covers the self-serve account-creation paths, email/password signup (`/sign-up/email`) and email OTP sign-in (`/sign-in/email-otp`, which creates an account when the user does not yet exist). Social (Google/GitHub) signup is intentionally unscreened because the OAuth provider is responsible for handling fraudulent/abusive accounts.
-- Email OTP is opt-in (`EMAIL_OTP_ENABLED=true`) with configurable expiry (`OTP_EXPIRATION_SECONDS`) and hashed OTP storage. Signing in with an OTP creates the account if it does not already exist, so it is fraud-screened just like email/password signup.
-- Public-domain policy (`BLOCK_PUBLIC_DOMAIN_SIGNUP=true`, requires `FRAUD_CHECK_API_URL`): reject email/OTP sign-ups whose address is a public/free provider, using the fraud API's `public_domain` verdict. The email must first pass the fraud gate (HTTP 200); the domain policy is then applied on top. OAuth (Google/GitHub) sign-ups are not affected. Default is off (public domains allowed).
+- The server checks env vars at startup and refuses to run with a bad config.
+- Sentry captures errors with tags for faster triage.
+- Fraud screening runs only when `FRAUD_CHECK_API_URL` is set ([DeGhost fraud detection API](https://deghost.hexbyte.dev), endpoint <https://deghostapi.hexbyte.dev>).
+  - **Email check, fail-closed.** The API must allow the email (HTTP 200). Otherwise the sign-up is blocked, also when the API is down or returns an error.
+  - **IP check, secondary.** Proxy, VPN and threat checks. Blocks only on an explicit threat verdict.
+  - **Screened paths:** email and password sign-up (`/sign-up/email`) and email OTP sign-in (`/sign-in/email-otp`, which creates the account if it doesn't exist). Google and GitHub sign-ups are not screened, because the OAuth provider handles abuse.
+- Email OTP is off by default. Turn it on with `EMAIL_OTP_ENABLED=true`. Codes are stored hashed and expire after `OTP_EXPIRATION_SECONDS`. OTP sign-in creates missing accounts, so it is fraud-screened like a normal sign-up.
+- `BLOCK_PUBLIC_DOMAIN_SIGNUP=true` (needs `FRAUD_CHECK_API_URL`) rejects email and OTP sign-ups from free providers, using the fraud API's `public_domain` verdict. It applies after the email passes the fraud check. Google and GitHub sign-ups are not affected. Off by default.
 
-  The sign-up hook rejects a request with one of these codes (Better-Auth returns them as JSON `{ code, message }`). These are **not** in the auto-generated Better-Auth schema shown at `/api/docs`, which only reflects Better-Auth's own endpoint schema, not custom hook logic:
+  A blocked sign-up returns JSON `{ code, message }` with one of these codes. They are not in the `/api/docs` schema, which covers only Better-Auth's own endpoints:
 
-  | HTTP | `code` | Trigger |
+  | HTTP | `code` | When |
   | :--- | :--- | :--- |
-  | 400 | `EMAIL_NOT_ALLOWED` | Fraud API did not allow the email (any non-200 → fail-closed). |
-  | 400 | `PUBLIC_DOMAIN_NOT_ALLOWED` | `BLOCK_PUBLIC_DOMAIN_SIGNUP=true` and the email is a public/free-provider domain. |
-  | 403 | `IP_NOT_ALLOWED` | Client IP returned an explicit threat verdict. |
-  | 503 | `FRAUD_CHECK_UNAVAILABLE` | Fraud API unreachable or errored (fail-closed). |
+  | 400 | `EMAIL_NOT_ALLOWED` | The fraud API did not allow the email (any non-200 response). |
+  | 400 | `PUBLIC_DOMAIN_NOT_ALLOWED` | `BLOCK_PUBLIC_DOMAIN_SIGNUP=true` and the email uses a free provider. |
+  | 403 | `IP_NOT_ALLOWED` | The client IP got an explicit threat verdict. |
+  | 503 | `FRAUD_CHECK_UNAVAILABLE` | The fraud API is unreachable or returned an error. |
 
-- Basic Auth middleware protects internal endpoints and uses timing-safe comparisons.
-- `/api/users/*` routes are mounted only when both `API_AUTH_USER` and `API_AUTH_PASSWORD` are configured. When enabled, the internal API is added as a second source in the unified `/api/docs` Scalar reference, generated from the same Zod schemas that validate the requests (so the docs cannot drift from the actual contract).
+- Basic Auth protects the internal endpoints and compares credentials in constant time.
+- `/api/users/*` is mounted only when both `API_AUTH_USER` and `API_AUTH_PASSWORD` are set. Its `/api/docs` entry is generated from the same Zod schemas that validate requests, so the docs always match the API.
 
 ### Running behind nginx / Cloudflare
 
-`getClientIP()` treats the reverse proxy as the trust boundary: it reads the unspoofable TCP socket address and only honors the `X-Real-IP` / `X-Forwarded-For` headers when the connection originates from a `TRUSTED_PROXIES` entry (exact IP or CIDR, IPv4 or IPv6). Set `TRUSTED_PROXIES` to the address the app actually sees the proxy connect from (for a co-located nginx that is usually `127.0.0.1` and/or `::1`).
+The reverse proxy is the trust boundary. `getClientIP()` uses the TCP socket address. It trusts `X-Real-IP` / `X-Forwarded-For` only when the connection comes from a `TRUSTED_PROXIES` entry (IP or CIDR, IPv4 or IPv6).
 
-When the app runs behind **Cloudflare → nginx → app**, let nginx restore the real visitor IP from Cloudflare's `CF-Connecting-IP` header but only trust that header from Cloudflare's published edge ranges and forward it to the app as `X-Real-IP`. The app then trusts nginx (via `TRUSTED_PROXIES`), and nginx is the single place responsible for deriving the real IP.
+Set `TRUSTED_PROXIES` to the address the proxy connects from. For nginx on the same host, that is usually `127.0.0.1` and/or `::1`.
+
+For **Cloudflare → nginx → app**:
+
+1. nginx reads the real visitor IP from `CF-Connecting-IP`, but trusts that header only from Cloudflare's IP ranges.
+2. nginx forwards the IP to the app as `X-Real-IP`.
+3. The app trusts nginx through `TRUSTED_PROXIES`.
+
+This way, nginx is the only place that decides the real IP.
 
 ```nginx
 # /etc/nginx/conf.d/cloudflare-real-ip.conf
@@ -250,10 +340,11 @@ server {
 }
 ```
 
-With this in place, set `TRUSTED_PROXIES=127.0.0.1` (and `::1` if nginx dials the app over IPv6). Without Cloudflare, drop the `set_real_ip_from` / `real_ip_header` block and keep the `server { … }` section; nginx sets `X-Real-IP` from its own `$remote_addr`.
+Then set `TRUSTED_PROXIES=127.0.0.1` (add `::1` if nginx connects to the app over IPv6).
+Without Cloudflare, remove the `set_real_ip_from` and `real_ip_header` lines and keep the `server { … }` block. nginx then sets `X-Real-IP` from its own `$remote_addr`.
 
 ### Development notes
 
-- Keep customizations outside Better-Auth internals to preserve upgradability.
+- Don't change Better-Auth internals. Keep custom code around it to preserve upgradability.
 
 License: [MIT](LICENSE)

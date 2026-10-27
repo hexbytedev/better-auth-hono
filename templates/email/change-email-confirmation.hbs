@@ -1,0 +1,17 @@
+{{#> layout}}
+	{{#*inline "body"}}
+		<p>{{#if name}}Hello {{name}},{{else}}Hello,{{/if}}</p>
+		<p>We received a request to change the email address on your account to <strong>{{newEmail}}</strong>. Click the button below to approve this change from your current inbox.</p>
+		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 10px; margin-bottom: 10px;">
+			<tr>
+				<td align="left">
+					<a href="{{url}}" style="background-color: #2d5a2d; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid #2d5a2d;">Approve Email Change</a>
+				</td>
+			</tr>
+		</table>
+		<p style="font-size: 14px; color: #71717a;">This link will expire in {{expiresIn}}. After you approve, we'll send a confirmation link to {{newEmail}} to finish the change.</p>
+	{{/inline}}
+	{{#*inline "footer"}}
+		If you didn't request an email change, you can safely ignore this email and consider reviewing your account's security. Your account email will remain unchanged.
+	{{/inline}}
+{{/layout}}

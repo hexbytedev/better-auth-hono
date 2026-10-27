@@ -9,7 +9,7 @@
 - Auth: `src/auth.ts` (Better-Auth config, hooks, plugins).
 - DB: `src/db/*` (Drizzle schema and db setup).
 - Internal API: `src/routes/users.route.ts` + `src/services/user.service.ts`.
-- Email integration: `src/lib/email.ts`.
+- Email integration: `src/lib/email.ts` (sending) and `src/lib/email-templates.ts` (Handlebars loader; default templates in `templates/email/`).
 
 ## Agent Rules & Guidance
 
@@ -29,7 +29,8 @@ When adding a new env var, make changes in three places:
 
 1. **`src/lib/env.ts`**: Use one of three helpers:
    - `requireEnv("NAME")`: app won't start without it (security-critical, DB credentials, API keys). Multiple missing vars are collected and reported together.
-   - `envWithDefault("NAME", "default")`: has a safe fallback for local dev (e.g. `JWT_EXPIRATION_TIME`, `PRIMARY_COLOR`). Logs a notice when default is used.
+   - `envWithDefault("NAME", "default")`: has a safe fallback for local dev (e.g. `JWT_EXPIRATION_TIME`, `TOTP_ISSUER_NAME`). Logs a notice when default is used.
+   - Numeric vars instead use `parseNumber` in `src/config/app.config.ts` (e.g. `TOKEN_EXPIRATION_SECONDS`, `APP_PORT`). It falls back to the default silently when unset, and warns on an invalid or out-of-range value.
    - `optionalEnv("NAME")`: truly optional, returns `undefined` if not set (e.g. feature flags, optional API URLs).
 
 2. **`.env.sample`**: Add the variable with a comment block explaining its purpose, format, and default value. Use the same section header style as existing entries.
@@ -39,7 +40,7 @@ When adding a new env var, make changes in three places:
 **How to judge required vs optional:**
 
 - `requireEnv` if the app cannot function without it (auth secrets, database URL, email credentials).
-- `envWithDefault` if local dev can work with a reasonable fallback but production should set it explicitly (branding colors, token expiry, dev-only URLs).
+- `envWithDefault` if local dev can work with a reasonable fallback but production should set it explicitly (token expiry, dev-only URLs).
 - `optionalEnv` if it genuinely enables/disables a non-critical feature (fraud check URL, Sentry DSN).
 
 **Important:** Keep all `requireEnv` / `envWithDefault` / `optionalEnv` calls at module scope, not inside request handlers. This ensures `checkEnv()` in `src/index.ts` catches missing vars before the server starts.

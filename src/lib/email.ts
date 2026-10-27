@@ -3,17 +3,23 @@
 import * as Sentry from "@sentry/bun";
 import { Resend } from "resend";
 import { OTP_EXPIRATION_SECONDS, TOKEN_EXPIRATION_SECONDS } from "../config/app.config";
-import { envWithDefault, requireEnv } from "./env";
+import {
+	EMAIL_FROM_NAME,
+	type EmailKind,
+	type EmailTemplateData,
+	type OtpType,
+	renderEmail,
+} from "./email-templates";
+import { requireEnv } from "./env";
 
 const RESEND_API_KEY = requireEnv("RESEND_API_KEY");
 const EMAIL_FROM = requireEnv("EMAIL_FROM");
-const COMPANY_NAME = requireEnv("COMPANY_NAME");
-const PRIMARY_COLOR_RAW = envWithDefault("PRIMARY_COLOR", "2d5a2d");
-
-// Add # prefix if not present
-const PRIMARY_COLOR = PRIMARY_COLOR_RAW.startsWith("#")
-	? PRIMARY_COLOR_RAW
-	: `#${PRIMARY_COLOR_RAW}`;
+// EMAIL_FROM is normally a bare address; the sender name comes from the templates' config.json.
+// A "Name <address>" value still works and wins, so existing configs keep their From header.
+// Reply-To always gets the bare address.
+const EMAIL_FROM_ADDRESS = EMAIL_FROM.match(/<([^>]+)>/)?.[1] ?? EMAIL_FROM;
+const EMAIL_FROM_HEADER =
+	EMAIL_FROM.includes("<") || !EMAIL_FROM_NAME ? EMAIL_FROM : `${EMAIL_FROM_NAME} <${EMAIL_FROM}>`;
 
 // Deferred to avoid crash during module init when env vars are missing.
 // By the time sendEmail runs, checkEnv() has already validated all requireEnv() calls.
@@ -23,41 +29,60 @@ function getResend(): Resend {
 	return resend;
 }
 
+type Locale = "en" | "de";
+
+// Units per locale: [singular, plural]. German is used by bilingual templates ({{expiresInDe}}).
+const TIME_UNITS: Record<
+	Locale,
+	{
+		hour: [string, string];
+		minute: [string, string];
+		second: [string, string];
+		and: string;
+		fallback: string;
+	}
+> = {
+	en: {
+		hour: ["hour", "hours"],
+		minute: ["minute", "minutes"],
+		second: ["second", "seconds"],
+		and: "and",
+		fallback: "a short time",
+	},
+	de: {
+		hour: ["Stunde", "Stunden"],
+		minute: ["Minute", "Minuten"],
+		second: ["Sekunde", "Sekunden"],
+		and: "und",
+		fallback: "kurze Zeit",
+	},
+};
+
 // Helper to convert seconds to human-readable format
-function formatExpirationTime(seconds: number): string {
+function formatExpirationTime(seconds: number, locale: Locale = "en"): string {
+	const units = TIME_UNITS[locale];
 	// Safety net for non-finite / zero / negative durations. With the range
 	// validation in app.config.ts these never reach here, but guard anyway so a
 	// misconfiguration can't render "0 second" / "-30 seconds" / "NaN second".
 	if (!Number.isFinite(seconds) || seconds <= 0) {
-		return "a short time";
+		return units.fallback;
 	}
 
+	const count = (value: number, [singular, plural]: [string, string]) =>
+		`${value} ${value === 1 ? singular : plural}`;
 	const hours = Math.floor(seconds / 3600);
 	const minutes = Math.floor((seconds % 3600) / 60);
 
 	if (hours > 0 && minutes > 0) {
-		return `${hours} hour${hours !== 1 ? "s" : ""} and ${minutes} minute${minutes !== 1 ? "s" : ""}`;
+		return `${count(hours, units.hour)} ${units.and} ${count(minutes, units.minute)}`;
 	}
 	if (hours > 0) {
-		return `${hours} hour${hours !== 1 ? "s" : ""}`;
+		return count(hours, units.hour);
 	}
 	if (minutes > 0) {
-		return `${minutes} minute${minutes !== 1 ? "s" : ""}`;
+		return count(minutes, units.minute);
 	}
-	return `${seconds} second${seconds !== 1 ? "s" : ""}`;
-}
-
-function escapeHtml(value: string): string {
-	return value
-		.replaceAll("&", "&amp;")
-		.replaceAll("<", "&lt;")
-		.replaceAll(">", "&gt;")
-		.replaceAll('"', "&quot;")
-		.replaceAll("'", "&#39;");
-}
-
-function escapeHtmlAttribute(value: string): string {
-	return escapeHtml(value);
+	return count(seconds, units.second);
 }
 
 interface User {
@@ -65,13 +90,35 @@ interface User {
 	name?: string;
 }
 
+/** The user's name for a greeting, or undefined so templates can fall back to a plain "Hello,". */
+function greetingName(user: User): string | undefined {
+	return user.name?.trim() || undefined;
+}
+
+/** Renders the template for `kind` with the formatted expiry, then sends it. */
+async function sendTemplatedEmail(
+	kind: EmailKind,
+	to: string,
+	data: Pick<EmailTemplateData, "name" | "url" | "email" | "newEmail" | "otp" | "otpType"> & {
+		expiresInSeconds: number;
+	},
+) {
+	const { expiresInSeconds, ...rest } = data;
+	const { subject, html } = renderEmail(kind, {
+		expiresIn: formatExpirationTime(expiresInSeconds),
+		expiresInDe: formatExpirationTime(expiresInSeconds, "de"),
+		...rest,
+	});
+	return sendEmail(kind, to, subject, html);
+}
+
 async function sendEmail(emailType: string, to: string, subject: string, html: string) {
 	const { data, error } = await getResend().emails.send({
-		from: `${COMPANY_NAME} <${EMAIL_FROM}>`,
+		from: EMAIL_FROM_HEADER,
 		to: [to],
 		subject,
 		html,
-		replyTo: EMAIL_FROM,
+		replyTo: EMAIL_FROM_ADDRESS,
 	});
 
 	if (error) {
@@ -101,103 +148,17 @@ async function sendEmail(emailType: string, to: string, subject: string, html: s
 }
 
 /**
- * Reusable HTML wrapper for email consistency across devices
- */
-function getEmailTemplate(title: string, bodyContent: string, footerContent: string) {
-	return `
-	<!DOCTYPE html>
-	<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
-		<head>
-			<meta charset="utf-8">
-			<meta name="viewport" content="width=device-width, initial-scale=1.0">
-			<meta name="color-scheme" content="light dark">
-			<meta name="supported-color-schemes" content="light dark">
-			<!--[if mso]>
-			<noscript>
-				<xml>
-					<o:OfficeDocumentSettings>
-						<o:PixelsPerInch>96</o:PixelsPerInch>
-					</o:OfficeDocumentSettings>
-				</xml>
-			</noscript>
-			<![endif]-->
-			<style>
-				body { margin: 0; padding: 0; background-color: #f4f4f5; -webkit-font-smoothing: antialiased; }
-				table { border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
-				p { margin: 0; padding: 0; margin-bottom: 24px; }
-				a { text-decoration: none; }
-			</style>
-		</head>
-		<body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-			<table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5;">
-				<tr>
-					<td align="center" style="padding: 40px 20px;">
-						<!--[if mso]>
-						<table align="center" width="600" cellspacing="0" cellpadding="0" border="0">
-						<tr><td>
-						<![endif]-->
-						<table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #ffffff; border: 1px solid #e4e4e7;">
-							<tr>
-								<td style="padding: 48px 40px;">
-									<h1 style="margin: 0 0 24px 0; font-size: 24px; font-weight: 600; color: #18181b; letter-spacing: -0.5px;">${title}</h1>
-
-									<div style="font-size: 16px; line-height: 1.6; color: #3f3f46;">
-										${bodyContent}
-									</div>
-								</td>
-							</tr>
-						</table>
-
-						<table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px;">
-							<tr>
-								<td style="padding: 32px 40px; text-align: left; font-size: 13px; line-height: 1.6; color: #71717a;">
-									${footerContent}
-								</td>
-							</tr>
-						</table>
-						<!--[if mso]>
-						</td></tr>
-						</table>
-						<![endif]-->
-					</td>
-				</tr>
-			</table>
-		</body>
-	</html>
-	`;
-}
-
-/**
  * Sends a verification email to the user
  * @param user - User object containing email and optional name
  * @param verificationUrl - The URL for email verification
  * @returns Promise with the email service response
  */
 export async function sendVerificationEmail(user: User, verificationUrl: string) {
-	const subject = "Verify your email address";
-	const safeName = escapeHtml(user.name || "there");
-	const safeCompanyName = escapeHtml(COMPANY_NAME);
-	const safeVerificationUrl = escapeHtmlAttribute(verificationUrl);
-
-	const bodyContent = `
-		<p>Hello ${safeName},</p>
-		<p>Thank you for signing up with <strong>${safeCompanyName}</strong>. To complete your registration and secure your account, please verify your email address.</p>
-		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 10px; margin-bottom: 10px;">
-			<tr>
-				<td align="left">
-					<a href="${safeVerificationUrl}" style="background-color: ${PRIMARY_COLOR}; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid ${PRIMARY_COLOR};">Verify Email Address</a>
-				</td>
-			</tr>
-		</table>
-		<p style="font-size: 14px; color: #71717a;">This link will expire in ${formatExpirationTime(TOKEN_EXPIRATION_SECONDS)}.</p>
-	`;
-
-	const footerContent = `
-		If you didn't create an account with us, you can safely ignore this email.
-	`;
-
-	const html = getEmailTemplate(subject, bodyContent, footerContent);
-	return sendEmail("verification", user.email, subject, html);
+	return sendTemplatedEmail("verification", user.email, {
+		name: greetingName(user),
+		url: verificationUrl,
+		expiresInSeconds: TOKEN_EXPIRATION_SECONDS,
+	});
 }
 
 /**
@@ -207,30 +168,11 @@ export async function sendVerificationEmail(user: User, verificationUrl: string)
  * @returns Promise with the email service response
  */
 export async function sendPasswordResetEmail(user: User, resetUrl: string) {
-	const subject = "Reset your password";
-	const safeName = escapeHtml(user.name || "there");
-	const safeCompanyName = escapeHtml(COMPANY_NAME);
-	const safeResetUrl = escapeHtmlAttribute(resetUrl);
-
-	const bodyContent = `
-		<p>Hello ${safeName},</p>
-		<p>We received a request to reset the password for your <strong>${safeCompanyName}</strong> account. You can set a new password by clicking the button below.</p>
-		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 10px; margin-bottom: 10px;">
-			<tr>
-				<td align="left">
-					<a href="${safeResetUrl}" style="background-color: ${PRIMARY_COLOR}; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid ${PRIMARY_COLOR};">Reset Password</a>
-				</td>
-			</tr>
-		</table>
-		<p style="font-size: 14px; color: #71717a;">This link will expire in ${formatExpirationTime(TOKEN_EXPIRATION_SECONDS)}.</p>
-	`;
-
-	const footerContent = `
-		If you didn't request a password reset, you can safely ignore this email. Your current password will remain unchanged.
-	`;
-
-	const html = getEmailTemplate(subject, bodyContent, footerContent);
-	return sendEmail("password-reset", user.email, subject, html);
+	return sendTemplatedEmail("password-reset", user.email, {
+		name: greetingName(user),
+		url: resetUrl,
+		expiresInSeconds: TOKEN_EXPIRATION_SECONDS,
+	});
 }
 
 /**
@@ -240,44 +182,12 @@ export async function sendPasswordResetEmail(user: User, resetUrl: string) {
  * @param type - The type of OTP (sign-in, email-verification, forget-password)
  * @returns Promise with the email service response
  */
-export async function sendOtpEmail(
-	email: string,
-	otp: string,
-	type: "sign-in" | "email-verification" | "forget-password" | "change-email",
-) {
-	const subjectByType = {
-		"sign-in": "Your sign-in code",
-		"email-verification": "Verify your email address",
-		"forget-password": "Reset your password",
-		"change-email": "Confirm your new email",
-	};
-
-	const bodyByType = {
-		"sign-in": `<p>Use the following code to sign in to your <strong>${escapeHtml(COMPANY_NAME)}</strong> account.</p>`,
-		"email-verification": `<p>Use the following code to verify your email address for <strong>${escapeHtml(COMPANY_NAME)}</strong>.</p>`,
-		"forget-password": `<p>Use the following code to reset your password for <strong>${escapeHtml(COMPANY_NAME)}</strong>.</p>`,
-		"change-email": `<p>Use the following code to confirm your new email address for <strong>${escapeHtml(COMPANY_NAME)}</strong>.</p>`,
-	};
-
-	const subject = subjectByType[type];
-	const bodyContent = `
-		${bodyByType[type]}
-		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 20px; margin-bottom: 20px;">
-			<tr>
-				<td align="center">
-					<div style="display: inline-block; background-color: #f4f4f5; border: 2px dashed #d4d4d8; border-radius: 12px; padding: 24px 48px; letter-spacing: 8px; font-size: 36px; font-weight: 700; color: #18181b; font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;">${escapeHtml(otp)}</div>
-				</td>
-			</tr>
-		</table>
-		<p style="font-size: 14px; color: #71717a;">This code will expire in ${formatExpirationTime(OTP_EXPIRATION_SECONDS)}. If you didn't request this, you can safely ignore this email.</p>
-	`;
-
-	const footerContent = `
-		If you didn't request this code, someone else might be trying to access your account. Please ignore this email.
-	`;
-
-	const html = getEmailTemplate(subject, bodyContent, footerContent);
-	return sendEmail(`otp-${type}`, email, subject, html);
+export async function sendOtpEmail(email: string, otp: string, type: OtpType) {
+	return sendTemplatedEmail(`otp-${type}`, email, {
+		otp,
+		otpType: type,
+		expiresInSeconds: OTP_EXPIRATION_SECONDS,
+	});
 }
 
 /**
@@ -287,31 +197,12 @@ export async function sendOtpEmail(
  * before invoking this step (see update-user.mjs / email-verification.mjs).
  */
 export async function sendChangeEmailVerificationEmail(user: User, verificationUrl: string) {
-	const subject = "Confirm your new email address";
-	const safeName = escapeHtml(user.name || "there");
-	const safeCompanyName = escapeHtml(COMPANY_NAME);
-	const safeEmail = escapeHtml(user.email);
-	const safeVerificationUrl = escapeHtmlAttribute(verificationUrl);
-
-	const bodyContent = `
-		<p>Hello ${safeName},</p>
-		<p>We received a request to use <strong>${safeEmail}</strong> as the email for your <strong>${safeCompanyName}</strong> account. Click the button below to confirm this address and finish the change.</p>
-		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 10px; margin-bottom: 10px;">
-			<tr>
-				<td align="left">
-					<a href="${safeVerificationUrl}" style="background-color: ${PRIMARY_COLOR}; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid ${PRIMARY_COLOR};">Confirm New Email</a>
-				</td>
-			</tr>
-		</table>
-		<p style="font-size: 14px; color: #71717a;">This link will expire in ${formatExpirationTime(TOKEN_EXPIRATION_SECONDS)}.</p>
-	`;
-
-	const footerContent = `
-		If you didn't request an email change, you can safely ignore this email. Your account email will remain unchanged.
-	`;
-
-	const html = getEmailTemplate(subject, bodyContent, footerContent);
-	return sendEmail("change-email-verification", user.email, subject, html);
+	return sendTemplatedEmail("change-email-verification", user.email, {
+		name: greetingName(user),
+		email: user.email,
+		url: verificationUrl,
+		expiresInSeconds: TOKEN_EXPIRATION_SECONDS,
+	});
 }
 
 /**
@@ -327,29 +218,10 @@ export async function sendChangeEmailConfirmationEmail(
 	newEmail: string,
 	confirmationUrl: string,
 ) {
-	const subject = "Approve email change";
-	const safeName = escapeHtml(user.name || "there");
-	const safeCompanyName = escapeHtml(COMPANY_NAME);
-	const safeNewEmail = escapeHtml(newEmail);
-	const safeConfirmationUrl = escapeHtmlAttribute(confirmationUrl);
-
-	const bodyContent = `
-		<p>Hello ${safeName},</p>
-		<p>We received a request to change the email address on your <strong>${safeCompanyName}</strong> account to <strong>${safeNewEmail}</strong>. Click the button below to approve this change from your current inbox.</p>
-		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 10px; margin-bottom: 10px;">
-			<tr>
-				<td align="left">
-					<a href="${safeConfirmationUrl}" style="background-color: ${PRIMARY_COLOR}; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid ${PRIMARY_COLOR};">Approve Email Change</a>
-				</td>
-			</tr>
-		</table>
-		<p style="font-size: 14px; color: #71717a;">This link will expire in ${formatExpirationTime(TOKEN_EXPIRATION_SECONDS)}. After you approve, we'll send a confirmation link to ${safeNewEmail} to finish the change.</p>
-	`;
-
-	const footerContent = `
-		If you didn't request an email change, you can safely ignore this email and consider reviewing your account's security. Your account email will remain unchanged.
-	`;
-
-	const html = getEmailTemplate(subject, bodyContent, footerContent);
-	return sendEmail("change-email-confirmation", user.email, subject, html);
+	return sendTemplatedEmail("change-email-confirmation", user.email, {
+		name: greetingName(user),
+		newEmail,
+		url: confirmationUrl,
+		expiresInSeconds: TOKEN_EXPIRATION_SECONDS,
+	});
 }

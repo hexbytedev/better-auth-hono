@@ -1,0 +1,17 @@
+{{#> layout}}
+	{{#*inline "body"}}
+		<p>{{#if name}}Hello {{name}},{{else}}Hello,{{/if}}</p>
+		<p>We received a request to use <strong>{{email}}</strong> as the email for your account. Click the button below to confirm this address and finish the change.</p>
+		<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 10px; margin-bottom: 10px;">
+			<tr>
+				<td align="left">
+					<a href="{{url}}" style="background-color: #2d5a2d; color: #ffffff; padding: 16px 32px; font-size: 16px; font-weight: 600; display: inline-block; border: 1px solid #2d5a2d;">Confirm New Email</a>
+				</td>
+			</tr>
+		</table>
+		<p style="font-size: 14px; color: #71717a;">This link will expire in {{expiresIn}}.</p>
+	{{/inline}}
+	{{#*inline "footer"}}
+		If you didn't request an email change, you can safely ignore this email. Your account email will remain unchanged.
+	{{/inline}}
+{{/layout}}

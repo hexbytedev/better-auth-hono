@@ -11,8 +11,6 @@ const smokeTestEnv: Record<string, string> = {
 	DATABASE_URL: "postgres://postgres:postgres@127.0.0.1:5432/smoke_test",
 	RESEND_API_KEY: "re_test_smoke",
 	EMAIL_FROM: "no-reply@example.com",
-	COMPANY_NAME: "Smoke Test Company",
-	PRIMARY_COLOR: "2d5a2d",
 	TOKEN_EXPIRATION_SECONDS: "3600",
 	JWT_EXPIRATION_TIME: "1h",
 	EMAIL_PASSWORD_ENABLED: "true",
