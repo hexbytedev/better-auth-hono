@@ -1,6 +1,6 @@
 // lib/email-templates.ts
 
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { accessSync, constants, existsSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import Handlebars from "handlebars";
 import { optionalEnv } from "./env";
@@ -76,6 +76,20 @@ function templateFileFor(kind: EmailKind): string {
 	return kind.startsWith("otp-") ? "otp" : kind;
 }
 
+/** Reads a template file, naming the file and the fix when the server isn't allowed to read it. */
+function readTemplateSource(path: string): string {
+	try {
+		return readFileSync(path, "utf8");
+	} catch (error) {
+		if (error instanceof Error && "code" in error && error.code === "EACCES") {
+			throw new Error(
+				`${path} is not readable by the server. Make the templates readable, e.g. chmod -R a+rX <folder>`,
+			);
+		}
+		throw error;
+	}
+}
+
 function isSubjectMap(value: object): value is SubjectMap {
 	return Object.values(value).every((entry) => typeof entry === "string");
 }
@@ -88,7 +102,7 @@ interface TemplateConfig {
 }
 
 function parseConfig(path: string): Partial<TemplateConfig> {
-	const parsed: object = JSON.parse(readFileSync(path, "utf8"));
+	const parsed: object = JSON.parse(readTemplateSource(path));
 	const fromName = "fromName" in parsed ? parsed.fromName : undefined;
 	const subjects = "subjects" in parsed ? parsed.subjects : undefined;
 
@@ -147,7 +161,7 @@ export function createEmailRenderer(customDir?: string): EmailRenderer {
 		if (!path) {
 			throw new Error(`Email template "${fileName}" not found in: ${dirs.join(", ")}`);
 		}
-		const source = readFileSync(path, "utf8");
+		const source = readTemplateSource(path);
 		// Triple braces disable HTML escaping, which would let a user's name inject markup.
 		if (/\{\{\{|\{\{&/.test(source)) {
 			throw new Error(
@@ -220,25 +234,44 @@ const OVERRIDABLE_FILES = [
 	"config.json",
 ];
 
-/** Logs where templates come from, so a wrong mount path shows up at startup, not as "wrong design". */
-function logTemplateSource(customDir?: string): void {
+/**
+ * Resolves EMAIL_TEMPLATES_DIR and logs where templates come from, so a wrong mount path shows up at
+ * startup, not as "wrong design". A path that doesn't exist or can't be read falls back to the built-in
+ * templates with a warning, like an empty folder, so a local run works without the deployment's path.
+ * A readable folder holding an unreadable file still stops the boot (see readTemplateSource).
+ */
+export function resolveTemplatesDir(customDir?: string): string | undefined {
 	if (!customDir) {
 		console.log("[EMAIL] Using the built-in email templates");
-		return;
+		return undefined;
 	}
 	const root = resolve(customDir);
+	if (!existsSync(root) || !statSync(root).isDirectory()) {
+		console.warn(
+			`[EMAIL] EMAIL_TEMPLATES_DIR (${root}) is not a directory, using the built-in templates. Check the path.`,
+		);
+		return undefined;
+	}
+	try {
+		accessSync(root, constants.R_OK | constants.X_OK);
+	} catch {
+		console.warn(
+			`[EMAIL] EMAIL_TEMPLATES_DIR (${root}) is not readable by the server, using the built-in templates. Make it readable, e.g. chmod -R a+rX ${root}`,
+		);
+		return undefined;
+	}
 	const found = OVERRIDABLE_FILES.filter((file) => existsSync(join(root, file)));
 	if (found.length === 0) {
 		console.warn(
 			`[EMAIL] EMAIL_TEMPLATES_DIR (${root}) contains no template files, using the built-in templates. Check the mount path.`,
 		);
-		return;
+	} else {
+		console.log(`[EMAIL] Using templates from ${root}, overriding: ${found.join(", ")}`);
 	}
-	console.log(`[EMAIL] Using templates from ${root}, overriding: ${found.join(", ")}`);
+	return root;
 }
 
-const EMAIL_TEMPLATES_DIR = optionalEnv("EMAIL_TEMPLATES_DIR");
-logTemplateSource(EMAIL_TEMPLATES_DIR);
+const EMAIL_TEMPLATES_DIR = resolveTemplatesDir(optionalEnv("EMAIL_TEMPLATES_DIR"));
 
 /** Sender display name from the template folder, or "" when there is none. */
 export const EMAIL_FROM_NAME: string = loadTemplateConfig(EMAIL_TEMPLATES_DIR).fromName;
