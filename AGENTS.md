@@ -29,7 +29,8 @@ When adding a new env var, make changes in three places:
 
 1. **`src/lib/env.ts`**: Use one of three helpers:
    - `requireEnv("NAME")`: app won't start without it (security-critical, DB credentials, API keys). Multiple missing vars are collected and reported together.
-   - `envWithDefault("NAME", "default")`: has a safe fallback for local dev (e.g. `JWT_EXPIRATION_TIME`, `TOKEN_EXPIRATION_SECONDS`). Logs a notice when default is used.
+   - `envWithDefault("NAME", "default")`: has a safe fallback for local dev (e.g. `JWT_EXPIRATION_TIME`, `TOTP_ISSUER_NAME`). Logs a notice when default is used.
+   - Numeric vars instead use `parseNumber` in `src/config/app.config.ts` (e.g. `TOKEN_EXPIRATION_SECONDS`, `APP_PORT`). It falls back to the default silently when unset, and warns on an invalid or out-of-range value.
    - `optionalEnv("NAME")`: truly optional, returns `undefined` if not set (e.g. feature flags, optional API URLs).
 
 2. **`.env.sample`**: Add the variable with a comment block explaining its purpose, format, and default value. Use the same section header style as existing entries.

@@ -14,8 +14,10 @@ places below or the fail-fast gate (`checkEnv()` in `src/index.ts`) will not pro
   email/company identity). Missing `requireEnv` vars are accumulated into one set and reported together
   by `checkEnv()`; no extra wiring needed.
 - `envWithDefault("NAME", "default")`: safe fallback for local dev, but production should set it
-  (e.g. `JWT_EXPIRATION_TIME`, `TOKEN_EXPIRATION_SECONDS`). Logs a notice when the
+  (e.g. `JWT_EXPIRATION_TIME`, `TOTP_ISSUER_NAME`). Logs a notice when the
   default is used.
+- Numeric vars instead use `parseNumber` in `src/config/app.config.ts` (e.g. `TOKEN_EXPIRATION_SECONDS`,
+  `APP_PORT`). It falls back to the default silently when unset, and warns on an invalid or out-of-range value.
 - `optionalEnv("NAME")`: truly optional, returns `undefined` when unset. Note: for feature flags the
   codebase often reads `process.env.NAME?.trim()` directly instead (see `FRAUD_CHECK_API_URL`,
   `isGoogleEnabled`, `EMAIL_OTP_ENABLED`); match the pattern already used in the file you edit.
