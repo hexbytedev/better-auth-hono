@@ -258,6 +258,7 @@ To try a design locally, set `EMAIL_TEMPLATES_DIR=./my-templates`. Restart after
   - **IP check, secondary.** Proxy, VPN and threat checks. Blocks only on an explicit threat verdict.
   - **Screened paths:** email and password sign-up (`/sign-up/email`) and email OTP sign-in (`/sign-in/email-otp`, which creates the account if it doesn't exist). Google and GitHub sign-ups are not screened, because the OAuth provider handles abuse.
 - Email OTP is off by default. Turn it on with `EMAIL_OTP_ENABLED=true`. Codes are stored hashed and expire after `OTP_EXPIRATION_SECONDS`. OTP sign-in creates missing accounts, so it is fraud-screened like a normal sign-up.
+- With email OTP on, new email and password accounts verify their address with a **6-digit code instead of a link**. Verify it with `authClient.emailOtp.verifyEmail({ email, otp })`. Resending through `sendVerificationEmail` also sends a code. With OTP off, they get a link. The server never sends both. Change-email confirmations are always links.
 - `BLOCK_PUBLIC_DOMAIN_SIGNUP=true` (needs `FRAUD_CHECK_API_URL`) rejects email and OTP sign-ups from free providers, using the fraud API's `public_domain` verdict. It applies after the email passes the fraud check. Google and GitHub sign-ups are not affected. Off by default.
 
   A blocked sign-up returns JSON `{ code, message }` with one of these codes. They are not in the `/api/docs` schema, which covers only Better-Auth's own endpoints:

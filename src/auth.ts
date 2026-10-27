@@ -100,7 +100,8 @@ const APP_SCHEME = process.env.APP_SCHEME?.trim();
 // Check if email/password authentication should be enabled (Defaults to true unless explicitly "false")
 const EMAIL_PASSWORD_ENABLED = process.env.EMAIL_PASSWORD_ENABLED?.trim().toLowerCase() !== "false";
 
-// Email OTP feature flag (Defaults to false unless explicitly "true")
+// Email OTP feature flag (Defaults to false unless explicitly "true"). When on, new accounts
+// verify their email with a code instead of a link (see emailVerification.sendVerificationEmail).
 const EMAIL_OTP_ENABLED = process.env.EMAIL_OTP_ENABLED?.trim().toLowerCase() === "true";
 
 // Rate limiting configuration
@@ -494,9 +495,19 @@ export const auth = betterAuth({
 				// indistinguishable from a signup token and always falls through to the
 				// signup copy below. This is a Better Auth API gap, not something fixable here.
 				const isChangeEmail = isChangeEmailVerificationToken(token);
+				// With EMAIL_OTP_ENABLED, a code replaces the signup link (also on resend), so a user
+				// never gets both. Change-email always stays a link. This is done here rather than with
+				// the email OTP plugin's sendVerificationOnSignUp, which would also email a code to the
+				// owner of an existing address on every duplicate sign-up.
+				const sendCode = EMAIL_OTP_ENABLED && !isChangeEmail;
 				try {
 					if (isChangeEmail) {
 						await sendChangeEmailVerificationEmail(user, url);
+					} else if (sendCode) {
+						const otp = await auth.api.createVerificationOTP({
+							body: { email: user.email, type: "email-verification" },
+						});
+						await sendOtpEmail(user.email, otp, "email-verification");
 					} else {
 						await sendVerificationEmail(user, url);
 					}
@@ -506,7 +517,9 @@ export const auth = betterAuth({
 							feature: "auth",
 							operation: isChangeEmail
 								? "send-change-email-verification"
-								: "send-verification-email",
+								: sendCode
+									? "send-verification-otp"
+									: "send-verification-email",
 						},
 						user: { id: user.id },
 						extra: isChangeEmail
