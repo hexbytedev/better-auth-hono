@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -8,6 +8,7 @@ import {
 	type EmailTemplateData,
 	loadTemplateConfig,
 	OTP_TYPES,
+	resolveTemplatesDir,
 	toExpiresIn,
 } from "./email-templates";
 
@@ -116,6 +117,41 @@ describe("custom email templates", () => {
 		const { html } = createEmailRenderer(dir)("verification", data);
 		expect(html).toContain("Custom Ada");
 	});
+
+	test("EMAIL_TEMPLATES_DIR falls back to the built-in templates when the folder doesn't exist", () => {
+		expect(resolveTemplatesDir(undefined)).toBeUndefined();
+		expect(resolveTemplatesDir(join(tmpdir(), "does-not-exist-email-templates"))).toBeUndefined();
+		const dir = makeTemplatesDir({ "layout.hbs": "x" });
+		expect(resolveTemplatesDir(dir)).toBe(dir);
+		const empty = makeTemplatesDir({});
+		expect(resolveTemplatesDir(empty)).toBe(empty);
+		expect(resolveTemplatesDir(join(dir, "layout.hbs"))).toBeUndefined();
+	});
+
+	// Root can read anything, so these permission checks only mean something for a normal user.
+	const asRoot = process.getuid?.() === 0;
+
+	test.skipIf(asRoot)(
+		"an unreadable EMAIL_TEMPLATES_DIR falls back to the built-in templates",
+		() => {
+			const dir = makeTemplatesDir({ "layout.hbs": "x" });
+			chmodSync(dir, 0o000);
+			try {
+				expect(resolveTemplatesDir(dir)).toBeUndefined();
+			} finally {
+				chmodSync(dir, 0o755);
+			}
+		},
+	);
+
+	test.skipIf(asRoot)(
+		"an unreadable template file stops the boot with the fix in the message",
+		() => {
+			const dir = makeTemplatesDir({ "layout.hbs": "x" });
+			chmodSync(join(dir, "layout.hbs"), 0o000);
+			expect(() => createEmailRenderer(dir)).toThrow("layout.hbs is not readable by the server");
+		},
+	);
 
 	test("throws when the directory does not exist", () => {
 		expect(() => createEmailRenderer(join(tmpdir(), "does-not-exist-email-templates"))).toThrow(
