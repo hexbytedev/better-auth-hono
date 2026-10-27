@@ -1,12 +1,12 @@
-# Email templates: the contract for replacing the design
+# Email templates: rules for custom design
 
-**Read this fully before changing any file in this directory.** You may change everything visual and every word of copy. You may NOT remove, rename or move the required parts listed below. If you do, the server refuses to start (by design) rather than send a broken email to a user.
+**Read this carefully before changing any file in this directory.** You may change everything visual and every word of copy. You may NOT remove, rename or move the required parts listed below. If you do, the server refuses to start (by design), so a broken email never reaches a user.
 
-## How replacement works
+## How it works
 
-- These are the **default** templates (Handlebars, `.hbs`).
-- A project replaces them by editing these files, **or** by setting `EMAIL_TEMPLATES_DIR` to its own directory with the same file names.
-- A file that is missing from the custom directory falls back to the one here, so a project can override only `layout.hbs`, or only a few emails.
+- These are the **default** templates, written in Handlebars (`.hbs`).
+- To change them, edit these files, or set `EMAIL_TEMPLATES_DIR` to your own folder with the same file names.
+- A file missing from your folder uses the default from here. You can override only `layout.hbs`, or just a few emails.
 - Templates are loaded once at startup. **Restart the server after any change.**
 
 ## What the server checks at startup
@@ -15,156 +15,160 @@ If any check fails, the server **stops booting** and prints which file and which
 
 1. Every template compiles and renders (no syntax errors, no missing files, no unknown partials or helpers).
 2. `layout.hbs` renders **both** `{{> body}}` and `{{> footer}}`.
-3. Every email prints its **required variables** (table below). The action link must be the `href` of a link or button.
+3. Every email prints its **required variables** (table below). The action link must be the `href` of a link.
 4. No template uses unescaped output: `{{{value}}}` and `{{&value}}` are **rejected**.
-5. `config.json` is valid: `fromName` (if present) is a safe string, and `subjects` is an object of strings with a subject for every email.
+5. `config.json` is valid: a safe `fromName` (if set), and a subject for every email.
 
-## What the server cannot check (you must do it)
+## What you must check yourself
 
-- Whether the email looks right in Gmail, Outlook and Apple Mail.
-- Whether images load. Use absolute `https://` URLs only.
-- Whether the footer wording is appropriate.
-- Whether the four OTP wordings (`otpType`) are all present and make sense.
+- The email looks right in Gmail, Outlook and Apple Mail.
+- Images load (absolute `https://` URLs only).
+- The footer wording fits.
+- All four OTP wordings exist and make sense.
 
-After changing a design, **send yourself every email** and click the button (checklist at the bottom).
+After a design change, **send yourself every email** and click every button (see the checklist below).
 
-## Files (names are fixed)
+## Files
+
+The file names are fixed.
 
 | File | Email | Sent by |
 | :--- | :--- | :--- |
 | `layout.hbs` | Shared HTML shell for every email | partial named `layout` |
 | `verification.hbs` | Sign-up email verification | `sendVerificationEmail` |
 | `password-reset.hbs` | Password reset link | `sendPasswordResetEmail` |
-| `otp.hbs` | One-time code, all four OTP types | `sendOtpEmail` |
+| `otp.hbs` | One-time code, for all four OTP types | `sendOtpEmail` |
 | `change-email-confirmation.hbs` | Approval link sent to the **current** address | `sendChangeEmailConfirmationEmail` |
 | `change-email-verification.hbs` | Confirmation link sent to the **new** address | `sendChangeEmailVerificationEmail` |
-| `config.json` | Sender name and the subject line per email | all of the above |
+| `config.json` | Sender name and one subject per email | all of the above |
 
-**Do NOT rename these files and do NOT add new ones.** The server only looks for these exact names. A new file is never read.
-
-`config.json` is the single place for everything that is not HTML, so the brand never needs an environment variable. It is described below.
+**Don't rename these files or add new ones.** The server reads only these names.
 
 ## Variables
 
-Use `{{name}}` (double braces) for every one of them. All are HTML-escaped automatically.
+Always use double braces, e.g. `{{name}}`. Every value is HTML-escaped.
 
-| Variable | Value | Set in |
+| Variable | Value | Available in |
 | :--- | :--- | :--- |
 | `{{subject}}` | The rendered subject line | every email (use it in `layout.hbs`) |
-| `{{name}}` | The user's name, or empty if unknown (greet with `{{#if name}}Hello {{name}},{{else}}Hello,{{/if}}`) | verification, password-reset, both change-email |
+| `{{name}}` | The user's name, or empty. Greet with `{{#if name}}Hello {{name}},{{else}}Hello,{{/if}}` | verification, password-reset, both change-email |
 | `{{url}}` | The action link (verify, reset, approve, confirm) | verification, password-reset, both change-email |
-| `{{expiresIn}}` | Human readable lifetime in English, e.g. `1 hour`, `5 minutes` | every email |
-| `{{expiresInDe}}` | The same lifetime in German, e.g. `1 Stunde`, `5 Minuten`, for bilingual designs | every email |
-| `{{email}}` | The **new** address being confirmed | change-email-verification only |
-| `{{newEmail}}` | The address the user asked to switch to | change-email-confirmation only |
-| `{{otp}}` | The one-time code | otp only |
-| `{{otpType}}` | `sign-in`, `email-verification`, `forget-password` or `change-email` | otp only |
+| `{{expiresIn}}` | How long the link or code is valid, in English, e.g. `1 hour`, `5 minutes` | every email |
+| `{{expiresInDe}}` | The same in German, e.g. `1 Stunde`, `5 Minuten`, for bilingual designs | every email |
+| `{{email}}` | The **new** address being confirmed | change-email-verification |
+| `{{newEmail}}` | The address the user wants to switch to | change-email-confirmation |
+| `{{otp}}` | The one-time code | otp |
+| `{{otpType}}` | `sign-in`, `email-verification`, `forget-password` or `change-email` | otp |
 
-- Variables not listed for a file render as an **empty string**. There is no error, so do not rely on them.
-- **No brand variables exist.** Company name, colors, logo and site URLs are NOT variables and NOT environment variables. Write them directly into the templates.
-- Do not invent new variables. The server will not supply them.
+- A variable used in the wrong file prints as an empty string, with no error.
+- There are **no brand variables**. Write the company name, colors, logo and links directly into the templates.
+- Don't invent variables. The server won't fill them.
 
-## Required per file (enforced at startup unless noted)
+## Required in each file
 
-| File | MUST contain | Optional |
+Checked at startup, unless marked "not checked".
+
+| File | Must contain | Optional |
 | :--- | :--- | :--- |
-| `layout.hbs` | `{{> body}}` once, `{{> footer}}` once | `{{subject}}` in `<title>` and as the heading (strongly recommended, not enforced) |
+| `layout.hbs` | `{{> body}}` once, `{{> footer}}` once | `{{subject}}` in `<title>` and as the heading (recommended, not checked) |
 | `verification.hbs` | `href="{{url}}"`, `{{expiresIn}}` | `{{name}}` |
 | `password-reset.hbs` | `href="{{url}}"`, `{{expiresIn}}` | `{{name}}` |
 | `change-email-verification.hbs` | `href="{{url}}"`, `{{email}}`, `{{expiresIn}}` | `{{name}}` |
 | `change-email-confirmation.hbs` | `href="{{url}}"`, `{{newEmail}}`, `{{expiresIn}}` | `{{name}}` |
-| `otp.hbs` | `{{otp}}`, `{{expiresIn}}` | `{{otpType}}` branches (keep all four, not enforced) |
+| `otp.hbs` | `{{otp}}`, `{{expiresIn}}` | all four `{{otpType}}` branches (keep them, not checked) |
 
-**`href="{{url}}"` means exactly that:** the variable is the whole value of the `href` attribute of an `<a>` tag. Printing `{{url}}` as plain text does not satisfy the check. Adding the link a second time as visible text under the button is fine and recommended.
+**`href="{{url}}"` means exactly that:** `{{url}}` must be the whole `href` value of an `<a>` tag. Printing it as plain text fails the check. Showing it again as text under the button is fine, and recommended.
 
 ### `layout.hbs`
 
-- A complete HTML document: `<!DOCTYPE html>` through `</html>`.
-- `{{> body}}` goes inside the main content area. `{{> footer}}` goes in the footer area. Each exactly once.
-- Put `{{subject}}` in `<title>` and as the visible heading. The email files do **not** repeat the heading.
+- A full HTML document, from `<!DOCTYPE html>` to `</html>`.
+- `{{> body}}` goes in the main content area, `{{> footer}}` in the footer. Once each.
+- Put `{{subject}}` in `<title>` and as the visible heading. Email files don't repeat the heading.
 
 ### `otp.hbs`
 
-Keep all four branches so the wording matches what the user is doing:
+Keep all four branches, so the text matches what the user is doing:
 
 ```handlebars
 {{#if (eq otpType "sign-in")}}
-	...
+  ...
 {{else if (eq otpType "email-verification")}}
-	...
+  ...
 {{else if (eq otpType "forget-password")}}
-	...
+  ...
 {{else if (eq otpType "change-email")}}
-	...
+  ...
 {{/if}}
 ```
 
-Show `{{otp}}` prominently, outside the branches. The code is the whole point of this email.
+Show `{{otp}}` large and outside the branches. The code is the point of this email.
+
+The `change-email` code is sent only when email OTP's change-email option is turned on in `src/auth.ts`. It is off by default, but keep the branch.
 
 ### `config.json`
 
-The one non-HTML file. It holds the sender name and the subject lines:
+The only non-HTML file. It holds the sender name and the subjects:
 
 ```json
 {
-	"fromName": "Acme",
-	"subjects": {
-		"verification": "Verify your email address",
-		"password-reset": "Reset your password"
-	}
+  "fromName": "Acme",
+  "subjects": {
+    "verification": "Verify your email address",
+    "password-reset": "Reset your password"
+  }
 }
 ```
 
-- **`fromName`** is the name recipients see next to the From address (`Acme <no-reply@acme.com>`). Use an empty string to show only the address. It may not contain `< > " , ;` or line breaks. A `Name <address>` value in `EMAIL_FROM` takes priority over it.
-- **`subjects`** keys are fixed: `verification`, `password-reset`, `change-email-verification`, `change-email-confirmation`, `otp-sign-in`, `otp-email-verification`, `otp-forget-password`, `otp-change-email`. Values are plain text (never HTML-escaped), e.g. `"Reset your password"`, and may use the variables above.
-- In a custom directory, anything you omit keeps the default: leave out `fromName` to keep the default one, and leave out a subject key to keep that default subject.
+- **`fromName`**: the name shown next to the sender address, as in `Acme <no-reply@acme.com>`. Use `""` to show only the address. Not allowed: `< > " , ;` and line breaks. A `Name <address>` value in `EMAIL_FROM` wins over it.
+- **`subjects`**: one subject per email. The keys are fixed: `verification`, `password-reset`, `change-email-verification`, `change-email-confirmation`, `otp-sign-in`, `otp-email-verification`, `otp-forget-password`, `otp-change-email`. Subjects are plain text (never HTML-escaped) and can use the variables above.
+- In a custom folder, anything you leave out keeps its default. Omit `fromName` to keep the default name. Omit a subject key to keep that default subject.
 
-## Structure every email file must follow
+## Structure of an email file
 
-Each email file (everything except `layout.hbs` and `config.json`) wraps the layout and defines exactly two blocks, `body` and `footer`:
+Every email file (all except `layout.hbs` and `config.json`) wraps the layout and defines two blocks, `body` and `footer`:
 
 ```handlebars
 {{#> layout}}
-	{{#*inline "body"}}
-		<p>Hello {{name}},</p>
-		<a href="{{url}}" style="...">Button text</a>
-		<p>This link will expire in {{expiresIn}}.</p>
-	{{/inline}}
-	{{#*inline "footer"}}
-		If you didn't request this, you can ignore this email.
-	{{/inline}}
+  {{#*inline "body"}}
+    <p>Hello {{name}},</p>
+    <a href="{{url}}" style="...">Button text</a>
+    <p>This link will expire in {{expiresIn}}.</p>
+  {{/inline}}
+  {{#*inline "footer"}}
+    If you didn't request this, you can ignore this email.
+  {{/inline}}
 {{/layout}}
 ```
 
-**Do not rename `layout`, `body` or `footer`.** If an email file leaves out the `footer` block, that part of the email is silently empty (the server does not catch this).
+**Don't rename `layout`, `body` or `footer`.** If you leave out the `footer` block, the footer is empty. The server doesn't catch this.
 
 ## Hard rules
 
-1. **Double braces only.** Never `{{{value}}}` or `{{&value}}`. They disable HTML escaping and let a user's name inject markup into the email. The server rejects them.
-2. **The only helper is `eq`**, used as `(eq otpType "sign-in")`. No other helpers, no `{{> something}}` includes other than `layout`, `body` and `footer`.
-3. **Email-safe HTML.** Table layout, inline `style` attributes, no external CSS, no JavaScript, no web fonts. Keep the `<!--[if mso]>` blocks if Outlook matters.
-4. **Images are absolute `https://` URLs** hosted by the project. Never relative paths, never `cid:`, never `data:`.
-5. **Never hardcode a link in place of `{{url}}`.** The link is per user and per request.
-6. **Never write the em dash character.** Use a comma, colon or a separate sentence.
+1. **Double braces only.** `{{{value}}}` and `{{&value}}` turn off HTML escaping, so a user's name could inject markup. The server rejects them.
+2. **`eq` is the only helper**, as in `(eq otpType "sign-in")`. The only partials are `layout`, `body` and `footer`.
+3. **Email-safe HTML.** Tables for layout and inline `style` attributes. No external CSS, JavaScript or web fonts. Keep the `<!--[if mso]>` blocks if you support Outlook.
+4. **Images use absolute `https://` URLs** on your own host. No relative paths, `cid:` or `data:`.
+5. **Never replace `{{url}}` with a fixed link.** Each link is unique to the user and the request.
+6. **Never use the em dash character.** Use a comma, a colon or a new sentence.
 
-## Applying a new design: checklist
+## Checklist for a new design
 
-1. Keep every file name and every `config.json` subject key.
-2. Rewrite `layout.hbs`: new shell, keeping `{{subject}}`, `{{> body}}`, `{{> footer}}`.
-3. Rewrite each email file: new markup and copy, keeping its **required** items and the `body` / `footer` blocks.
-4. In `otp.hbs`, keep all four `otpType` branches and `{{otp}}`.
-5. Update `config.json` (sender name and subject wording) if the brand changes. Keep the subject keys.
-6. Restart the server. If it exits, read the message: it names the file and the missing variable.
-7. Send yourself every email: sign up, request a password reset, change your email (both messages), and each OTP flow if enabled. Click each button and confirm it lands on the right page.
+1. Keep every file name and every subject key in `config.json`.
+2. Rewrite `layout.hbs`. Keep `{{subject}}`, `{{> body}}` and `{{> footer}}`.
+3. Rewrite each email file. Keep its required items and the `body` and `footer` blocks.
+4. In `otp.hbs`, keep `{{otp}}` and all four `otpType` branches.
+5. If the brand changes, update `fromName` and the subjects in `config.json`.
+6. Restart the server. If it stops, the error names the file and the missing variable.
+7. Send yourself every email: sign up, reset a password, change your email (both emails), and each OTP flow you use. Click every button and check where it lands.
 
-## Instructions for an AI agent
+## For AI agents
 
-When asked to apply a new design to these templates:
+When asked to apply a new design here:
 
-- **Read this whole file first.** Treat "Required per file" and "Hard rules" as non-negotiable.
-- Change markup, styling and copy freely. Never delete, rename or relocate a required variable out of its role. Never replace `{{url}}` with a literal link or `{{otp}}` with a literal code.
-- Keep the file names, the `layout` / `body` / `footer` structure and the `config.json` subject keys exactly.
-- Do not edit anything under `src/` to make a design fit. If the design needs a variable that is not listed here, **say so and stop**. Do not invent one.
-- Do not add new files to this directory expecting them to be used.
-- After editing files in this directory, run `bun test src/lib/email-templates.test.ts` and report any failure. For a custom directory, start the server with `EMAIL_TEMPLATES_DIR` pointing at it and report the startup output.
-- In your summary, list which required variables each changed file still contains, so the user can verify.
+- Read this whole file first. "Required in each file" and "Hard rules" are not negotiable.
+- Change markup, styling and copy freely. Never remove a required variable or move it out of its role. Never replace `{{url}}` with a fixed link or `{{otp}}` with a fixed code.
+- Keep the file names, the `layout` / `body` / `footer` structure and the `config.json` subject keys.
+- Don't edit `src/` to make a design fit. If the design needs a variable that isn't listed here, **say so and stop**. Don't invent one.
+- Don't add new files here expecting the server to use them.
+- After editing, run `bun test src/lib/email-templates.test.ts` and report any failure. For a custom folder, start the server with `EMAIL_TEMPLATES_DIR` pointing at it and report the startup log.
+- In your summary, list the required variables each changed file still contains, so the user can check.
