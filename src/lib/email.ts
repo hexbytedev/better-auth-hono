@@ -9,6 +9,7 @@ import {
 	type EmailTemplateData,
 	type OtpType,
 	renderEmail,
+	toExpiresIn,
 } from "./email-templates";
 import { requireEnv } from "./env";
 
@@ -29,62 +30,6 @@ function getResend(): Resend {
 	return resend;
 }
 
-type Locale = "en" | "de";
-
-// Units per locale: [singular, plural]. German is used by bilingual templates ({{expiresInDe}}).
-const TIME_UNITS: Record<
-	Locale,
-	{
-		hour: [string, string];
-		minute: [string, string];
-		second: [string, string];
-		and: string;
-		fallback: string;
-	}
-> = {
-	en: {
-		hour: ["hour", "hours"],
-		minute: ["minute", "minutes"],
-		second: ["second", "seconds"],
-		and: "and",
-		fallback: "a short time",
-	},
-	de: {
-		hour: ["Stunde", "Stunden"],
-		minute: ["Minute", "Minuten"],
-		second: ["Sekunde", "Sekunden"],
-		and: "und",
-		fallback: "kurze Zeit",
-	},
-};
-
-// Helper to convert seconds to human-readable format
-function formatExpirationTime(seconds: number, locale: Locale = "en"): string {
-	const units = TIME_UNITS[locale];
-	// Safety net for non-finite / zero / negative durations. With the range
-	// validation in app.config.ts these never reach here, but guard anyway so a
-	// misconfiguration can't render "0 second" / "-30 seconds" / "NaN second".
-	if (!Number.isFinite(seconds) || seconds <= 0) {
-		return units.fallback;
-	}
-
-	const count = (value: number, [singular, plural]: [string, string]) =>
-		`${value} ${value === 1 ? singular : plural}`;
-	const hours = Math.floor(seconds / 3600);
-	const minutes = Math.floor((seconds % 3600) / 60);
-
-	if (hours > 0 && minutes > 0) {
-		return `${count(hours, units.hour)} ${units.and} ${count(minutes, units.minute)}`;
-	}
-	if (hours > 0) {
-		return count(hours, units.hour);
-	}
-	if (minutes > 0) {
-		return count(minutes, units.minute);
-	}
-	return count(seconds, units.second);
-}
-
 interface User {
 	email: string;
 	name?: string;
@@ -95,7 +40,7 @@ function greetingName(user: User): string | undefined {
 	return user.name?.trim() || undefined;
 }
 
-/** Renders the template for `kind` with the formatted expiry, then sends it. */
+/** Renders the template for `kind` with the expiry split into numbers, then sends it. */
 async function sendTemplatedEmail(
 	kind: EmailKind,
 	to: string,
@@ -105,8 +50,7 @@ async function sendTemplatedEmail(
 ) {
 	const { expiresInSeconds, ...rest } = data;
 	const { subject, html } = renderEmail(kind, {
-		expiresIn: formatExpirationTime(expiresInSeconds),
-		expiresInDe: formatExpirationTime(expiresInSeconds, "de"),
+		expiresIn: toExpiresIn(expiresInSeconds),
 		...rest,
 	});
 	return sendEmail(kind, to, subject, html);

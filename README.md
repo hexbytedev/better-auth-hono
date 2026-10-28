@@ -158,7 +158,9 @@ The image ships English templates in `/app/templates/email`. To use your own des
 
 - `[EMAIL] Using the built-in email templates`: `EMAIL_TEMPLATES_DIR` is not set.
 - `[EMAIL] EMAIL_TEMPLATES_DIR (...) contains no template files`: the folder is empty, or the mount path doesn't match `EMAIL_TEMPLATES_DIR`.
-- `EMAIL_TEMPLATES_DIR is not a directory`: the path doesn't exist in the container. The server stops.
+- `[EMAIL] EMAIL_TEMPLATES_DIR (...) is not a directory`: the path doesn't exist (in the container, or on your machine when running locally). The server starts with the built-in templates.
+- `[EMAIL] EMAIL_TEMPLATES_DIR (...) is not readable by the server`: the container's non-root user can't open the folder. Run `chmod -R a+rX` on it. The server starts with the built-in templates.
+- `... is not readable by the server` naming a single file: the folder is readable but that file isn't. The server stops. Run `chmod -R a+rX` on the folder.
 - An error naming a file and a `{{variable}}`: a template breaks the rules. The server stops. See `templates/email/README.md`.
 
 ## For developers
@@ -241,8 +243,9 @@ Each email file wraps the layout and fills two blocks:
 {{/layout}}
 ```
 
-- Variables: `subject`, `name`, `url` (the action link), `expiresIn` (e.g. `1 hour`), `expiresInDe` (the same in German), `email`, `newEmail`, `otp` and `otpType`. Which ones are set depends on the email.
+- Variables: `subject`, `name`, `url` (the action link), `expiresIn.hours` / `expiresIn.minutes` / `expiresIn.seconds` (the expiry as numbers, e.g. `1`, `20`, `30`), `email`, `newEmail`, `otp` and `otpType`. Which ones are set depends on the email.
 - Compare values with the `eq` helper: `{{#if (eq otpType "sign-in")}}`.
+- The expiry is numbers only, so the template writes the units ("hour", "Stunde", ...) in its own language. Copy the pattern from "Writing the expiry time" in `templates/email/README.md`.
 - `{{value}}` escapes HTML. Never use `{{{value}}}`: the server rejects it.
 
 The server checks every template at startup: syntax, required variables (such as the action link or the OTP code), and no `{{{ }}}`. A broken design stops the server with a clear error, instead of failing when a user needs the email. Full rules: `templates/email/README.md`.

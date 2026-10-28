@@ -16,7 +16,7 @@
 				</td>
 			</tr>
 		</table>
-		<p style="font-size: 14px; color: #71717a;">This code will expire in {{expiresIn}}. If you didn't request this, you can safely ignore this email.</p>
+		<p style="font-size: 14px; color: #71717a;">This code will expire in{{#if expiresIn.hours}} {{expiresIn.hours}} {{#if (eq expiresIn.hours 1)}}hour{{else}}hours{{/if}}{{/if}}{{#if expiresIn.minutes}} {{expiresIn.minutes}} {{#if (eq expiresIn.minutes 1)}}minute{{else}}minutes{{/if}}{{/if}}{{#if expiresIn.seconds}} {{expiresIn.seconds}} {{#if (eq expiresIn.seconds 1)}}second{{else}}seconds{{/if}}{{/if}}. If you didn't request this, you can safely ignore this email.</p>
 	{{/inline}}
 	{{#*inline "footer"}}
 		If you didn't request this code, someone else might be trying to access your account. Please ignore this email.

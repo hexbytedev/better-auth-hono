@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -8,11 +8,12 @@ import {
 	type EmailTemplateData,
 	loadTemplateConfig,
 	OTP_TYPES,
+	resolveTemplatesDir,
+	toExpiresIn,
 } from "./email-templates";
 
 const data: EmailTemplateData = {
-	expiresIn: "1 hour",
-	expiresInDe: "1 Stunde",
+	expiresIn: { hours: 1, minutes: 0, seconds: 0 },
 	name: "Ada",
 	url: "https://example.com/verify?token=abc&next=%2Fhome",
 	email: "ada@example.com",
@@ -110,12 +111,47 @@ describe("custom email templates", () => {
 	test("replaces a body template", () => {
 		const dir = makeTemplatesDir({
 			"verification.hbs": verificationWith(
-				'Custom {{name}} <a href="{{url}}">go</a> {{expiresIn}}',
+				'Custom {{name}} <a href="{{url}}">go</a> {{expiresIn.hours}}',
 			),
 		});
 		const { html } = createEmailRenderer(dir)("verification", data);
 		expect(html).toContain("Custom Ada");
 	});
+
+	test("EMAIL_TEMPLATES_DIR falls back to the built-in templates when the folder doesn't exist", () => {
+		expect(resolveTemplatesDir(undefined)).toBeUndefined();
+		expect(resolveTemplatesDir(join(tmpdir(), "does-not-exist-email-templates"))).toBeUndefined();
+		const dir = makeTemplatesDir({ "layout.hbs": "x" });
+		expect(resolveTemplatesDir(dir)).toBe(dir);
+		const empty = makeTemplatesDir({});
+		expect(resolveTemplatesDir(empty)).toBe(empty);
+		expect(resolveTemplatesDir(join(dir, "layout.hbs"))).toBeUndefined();
+	});
+
+	// Root can read anything, so these permission checks only mean something for a normal user.
+	const asRoot = process.getuid?.() === 0;
+
+	test.skipIf(asRoot)(
+		"an unreadable EMAIL_TEMPLATES_DIR falls back to the built-in templates",
+		() => {
+			const dir = makeTemplatesDir({ "layout.hbs": "x" });
+			chmodSync(dir, 0o000);
+			try {
+				expect(resolveTemplatesDir(dir)).toBeUndefined();
+			} finally {
+				chmodSync(dir, 0o755);
+			}
+		},
+	);
+
+	test.skipIf(asRoot)(
+		"an unreadable template file stops the boot with the fix in the message",
+		() => {
+			const dir = makeTemplatesDir({ "layout.hbs": "x" });
+			chmodSync(join(dir, "layout.hbs"), 0o000);
+			expect(() => createEmailRenderer(dir)).toThrow("layout.hbs is not readable by the server");
+		},
+	);
 
 	test("throws when the directory does not exist", () => {
 		expect(() => createEmailRenderer(join(tmpdir(), "does-not-exist-email-templates"))).toThrow(
@@ -142,27 +178,27 @@ describe("custom email templates", () => {
 
 	test("rejects a template that drops the action link", () => {
 		const dir = makeTemplatesDir({
-			"password-reset.hbs": verificationWith("Hi {{name}}, expires {{expiresIn}}"),
+			"password-reset.hbs": verificationWith("Hi {{name}}, expires {{expiresIn.hours}}"),
 		});
 		expect(() => createEmailRenderer(dir)).toThrow("{{url}}");
 	});
 
 	test("rejects a template that prints the link as text instead of an href", () => {
 		const dir = makeTemplatesDir({
-			"verification.hbs": verificationWith("Hi {{name}} {{url}} {{expiresIn}}"),
+			"verification.hbs": verificationWith("Hi {{name}} {{url}} {{expiresIn.hours}}"),
 		});
 		expect(() => createEmailRenderer(dir)).toThrow('href="{{url}}"');
 	});
 
 	test("rejects an OTP template that drops the code", () => {
-		const dir = makeTemplatesDir({ "otp.hbs": verificationWith("Code soon, {{expiresIn}}") });
+		const dir = makeTemplatesDir({ "otp.hbs": verificationWith("Code soon, {{expiresIn.hours}}") });
 		expect(() => createEmailRenderer(dir)).toThrow("{{otp}}");
 	});
 
 	test("rejects a change-email template that drops the address", () => {
 		const dir = makeTemplatesDir({
 			"change-email-confirmation.hbs": verificationWith(
-				'{{name}} <a href="{{url}}">ok</a> {{expiresIn}}',
+				'{{name}} <a href="{{url}}">ok</a> {{expiresIn.hours}}',
 			),
 		});
 		expect(() => createEmailRenderer(dir)).toThrow("{{newEmail}}");
@@ -170,7 +206,9 @@ describe("custom email templates", () => {
 
 	test("rejects unescaped triple-brace output", () => {
 		const dir = makeTemplatesDir({
-			"verification.hbs": verificationWith('{{{name}}} <a href="{{url}}">go</a> {{expiresIn}}'),
+			"verification.hbs": verificationWith(
+				'{{{name}}} <a href="{{url}}">go</a> {{expiresIn.hours}}',
+			),
 		});
 		expect(() => createEmailRenderer(dir)).toThrow("unescaped output");
 	});
@@ -183,15 +221,54 @@ describe("custom email templates", () => {
 	});
 });
 
-describe("variables for bilingual designs", () => {
-	test("a custom template can print the German expiry text next to the English one", () => {
+describe("expiresIn (numbers only, units written by the template)", () => {
+	test("toExpiresIn splits seconds into every part, without rounding", () => {
+		expect(toExpiresIn(30)).toEqual({ hours: 0, minutes: 0, seconds: 30 });
+		expect(toExpiresIn(300)).toEqual({ hours: 0, minutes: 5, seconds: 0 });
+		expect(toExpiresIn(3600)).toEqual({ hours: 1, minutes: 0, seconds: 0 });
+		expect(toExpiresIn(4830)).toEqual({ hours: 1, minutes: 20, seconds: 30 });
+		expect(toExpiresIn(90061)).toEqual({ hours: 25, minutes: 1, seconds: 1 });
+	});
+
+	test("toExpiresIn turns invalid durations into zeros instead of NaN", () => {
+		for (const bad of [0, -60, Number.NaN, Number.POSITIVE_INFINITY]) {
+			expect(toExpiresIn(bad)).toEqual({ hours: 0, minutes: 0, seconds: 0 });
+		}
+		expect(toExpiresIn(90.9)).toEqual({ hours: 0, minutes: 1, seconds: 30 });
+	});
+
+	test("the built-in templates print every non-zero part with English units", () => {
+		const render = createEmailRenderer();
+		const expires = (expiresIn: EmailTemplateData["expiresIn"]) =>
+			render("verification", { ...data, expiresIn }).html;
+		expect(expires({ hours: 1, minutes: 0, seconds: 0 })).toContain("expire in 1 hour.");
+		expect(expires({ hours: 0, minutes: 5, seconds: 0 })).toContain("expire in 5 minutes.");
+		expect(expires({ hours: 1, minutes: 20, seconds: 30 })).toContain(
+			"expire in 1 hour 20 minutes 30 seconds.",
+		);
+		expect(expires({ hours: 2, minutes: 0, seconds: 1 })).toContain("expire in 2 hours 1 second.");
+	});
+
+	test("a custom template can write the units in its own language", () => {
 		const dir = makeTemplatesDir({
 			"verification.hbs": verificationWith(
-				'<a href="{{url}}">go</a> DE {{expiresInDe}} | EN {{expiresIn}}',
+				'<a href="{{url}}">go</a> [{{expiresIn.hours}} Stunde {{expiresIn.minutes}} Minuten {{expiresIn.seconds}} Sekunden]',
 			),
 		});
-		const { html } = createEmailRenderer(dir)("verification", data);
-		expect(html).toContain("DE 1 Stunde | EN 1 hour");
+		const { html } = createEmailRenderer(dir)("verification", {
+			...data,
+			expiresIn: { hours: 1, minutes: 20, seconds: 30 },
+		});
+		expect(html).toContain("[1 Stunde 20 Minuten 30 Sekunden]");
+	});
+
+	test("a template that prints no part of the expiry fails the boot", () => {
+		const dir = makeTemplatesDir({
+			"verification.hbs": verificationWith('<a href="{{url}}">go</a>'),
+		});
+		expect(() => createEmailRenderer(dir)).toThrow(
+			"must print {{expiresIn.hours/minutes/seconds}}",
+		);
 	});
 
 	test("the built-in templates greet without a name instead of printing an empty one", () => {
