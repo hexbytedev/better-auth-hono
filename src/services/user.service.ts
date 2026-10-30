@@ -1,7 +1,7 @@
 // src/services/user.service.ts
 
 import * as Sentry from "@sentry/bun";
-import { eq, type SQL } from "drizzle-orm";
+import { asc, eq, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db";
 import { users } from "../db/schema";
@@ -45,6 +45,15 @@ function transformUserToResponse(dbUser: SafeUserRow): UserResponse {
 	};
 }
 
+const safeUserColumns = {
+	id: users.id,
+	email: users.email,
+	name: users.name,
+	image: users.image,
+	emailVerified: users.emailVerified,
+	twoFactorEnabled: users.twoFactorEnabled,
+};
+
 /**
  * Shared user lookup: fetch a single user by an arbitrary WHERE condition and
  * shape it through the safe response transform. Centralizes the select list,
@@ -63,18 +72,7 @@ async function findUser(
 	},
 ): Promise<UserResponse | null> {
 	try {
-		const user = await db
-			.select({
-				id: users.id,
-				email: users.email,
-				name: users.name,
-				image: users.image,
-				emailVerified: users.emailVerified,
-				twoFactorEnabled: users.twoFactorEnabled,
-			})
-			.from(users)
-			.where(where)
-			.limit(1);
+		const user = await db.select(safeUserColumns).from(users).where(where).limit(1);
 
 		if (!user[0]) {
 			return null;
@@ -142,4 +140,41 @@ export async function getUserById(userId: string): Promise<UserResponse | null> 
 		label: "ID",
 		extra: { userId },
 	});
+}
+
+/**
+ * List users, oldest first, one page at a time
+ *
+ * @param limit - Max users to return
+ * @param offset - Users to skip
+ * @returns The page of users, and whether more exist after it
+ */
+export async function listUsers(
+	limit: number,
+	offset: number,
+): Promise<{ users: UserResponse[]; hasNext: boolean }> {
+	try {
+		// Fetch one extra row to know if there is a next page without a COUNT(*).
+		const rows = await db
+			.select(safeUserColumns)
+			.from(users)
+			.orderBy(asc(users.id))
+			.limit(limit + 1)
+			.offset(offset);
+
+		return {
+			users: rows.slice(0, limit).map(transformUserToResponse),
+			hasNext: rows.length > limit,
+		};
+	} catch (error) {
+		console.error("Error listing users:", error);
+
+		Sentry.captureException(error, {
+			tags: { feature: "database", operation: "listUsers", table: "users" },
+			extra: { limit, offset, query: "SELECT users page", database: "postgresql" },
+			level: "error",
+		});
+
+		throw error;
+	}
 }

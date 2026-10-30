@@ -75,7 +75,8 @@ if (isBasicAuthEnabled) {
 	console.log("   Protected routes: /api/users/* are NOT mounted");
 }
 
-const app = new Hono();
+// strict: false so /api/users/ (what Scalar calls for the list route) matches /api/users.
+const app = new Hono({ strict: false });
 
 // --- CORS Middleware ---
 app.use(

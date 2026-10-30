@@ -4,7 +4,7 @@ import * as Sentry from "@sentry/bun";
 import { requireEnv } from "../lib/env";
 import { maskEmail } from "../lib/redaction";
 import { validateBasicAuth } from "../middleware/api-key.middleware";
-import { getUserByEmail, getUserById } from "../services/user.service";
+import { getUserByEmail, getUserById, listUsers } from "../services/user.service";
 
 // Canonical public base URL; used only inside the request-time doc handler, so
 // the requireEnv placeholder is inert at module load (see lib/env.ts contract).
@@ -52,6 +52,58 @@ const SuccessResponse = z
 		data: UserData,
 	})
 	.openapi("UserLookupSuccess");
+
+const ListUsersQuery = z.object({
+	limit: z.coerce
+		.number()
+		.int()
+		.min(1)
+		.max(100)
+		.default(50)
+		.openapi({
+			param: { name: "limit", in: "query" },
+			description: "Users per page, 1 to 100. Defaults to 50.",
+			example: 50,
+		}),
+	offset: z.coerce
+		.number()
+		.int()
+		.min(0)
+		.default(0)
+		.openapi({
+			param: { name: "offset", in: "query" },
+			// Coercion turns null into 0, which passes min(0), so the generator would mark it nullable.
+			type: "integer",
+			minimum: 0,
+			default: 0,
+			description: "Users to skip before this page. Defaults to 0.",
+			example: 0,
+		}),
+});
+
+const ListResponse = z
+	.object({
+		success: z.literal(true),
+		data: z.array(UserData),
+		pagination: z
+			.object({
+				page: z.number().int().openapi({
+					description: "1-based page number, computed as floor(offset / limit) + 1.",
+					example: 1,
+				}),
+				pageSize: z.number().int().openapi({
+					description: "Max users per page (the effective limit).",
+					example: 50,
+				}),
+				offset: z.number().int().openapi({ example: 0 }),
+				hasNext: z
+					.boolean()
+					.openapi({ description: "More users exist after this page.", example: true }),
+				hasPrevious: z.boolean().openapi({ description: "True when offset > 0.", example: false }),
+			})
+			.openapi("Pagination"),
+	})
+	.openapi("UserListSuccess");
 
 const ErrorResponse = z
 	.object({
@@ -210,6 +262,72 @@ usersRoute.openapi(lookupByIdRoute, async (c) => {
 		Sentry.captureException(error, {
 			tags: { feature: "user-api", route: "get-user-by-id", method: "GET" },
 			extra: { userId: id, userAgent: c.req.header("user-agent") },
+			level: "error",
+		});
+
+		return c.json(
+			{
+				success: false as const,
+				error: "Internal server error",
+				message: "An error occurred while fetching user data",
+			},
+			500,
+		);
+	}
+});
+
+// ── GET /api/users ─────────────────────────────────────────────────────────
+
+const listUsersRoute = createRoute({
+	method: "get",
+	path: "/",
+	tags: ["Users"],
+	summary: "List users",
+	description:
+		"Returns the safe, non-sensitive profile fields for one page of users, oldest first. Page with limit/offset; without them it returns the first 50 users. Protected by Basic Auth (plus the optional API_ALLOWED_IPS whitelist).",
+	security: [{ basicAuth: [] }],
+	middleware: [validateBasicAuth] as const,
+	request: {
+		query: ListUsersQuery,
+	},
+	responses: {
+		200: {
+			description: "One page of users (empty array past the last page).",
+			content: { "application/json": { schema: ListResponse } },
+		},
+		400: jsonError("Bad Request: invalid limit/offset or malformed Basic Auth token."),
+		401: sharedErrorResponses[401],
+		403: sharedErrorResponses[403],
+		500: sharedErrorResponses[500],
+	},
+});
+
+usersRoute.openapi(listUsersRoute, async (c) => {
+	const { limit, offset } = c.req.valid("query");
+
+	try {
+		const { users, hasNext } = await listUsers(limit, offset);
+
+		return c.json(
+			{
+				success: true as const,
+				data: users,
+				pagination: {
+					page: Math.floor(offset / limit) + 1,
+					pageSize: limit,
+					offset,
+					hasNext,
+					hasPrevious: offset > 0,
+				},
+			},
+			200,
+		);
+	} catch (error) {
+		console.error("Error in / route:", error);
+
+		Sentry.captureException(error, {
+			tags: { feature: "user-api", route: "list-users", method: "GET" },
+			extra: { limit, offset, userAgent: c.req.header("user-agent") },
 			level: "error",
 		});
 

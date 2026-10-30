@@ -16,7 +16,7 @@ A ready-to-deploy Docker image of Better-Auth, wrapped in Hono. It includes pass
 - One Docker image for the server and the schema setup (`Dockerfile`, `docker-compose.yml`).
 - Drizzle schema with UUID primary keys and indexes for fast lookups (`src/db/schema.ts`).
 - JWTs for your microservices (`src/auth.ts`).
-- An internal user lookup API behind Basic Auth: `GET /api/users/id/:id` and `POST /api/users/email`.
+- An internal user lookup API behind Basic Auth: `GET /api/users` (paged with `limit`/`offset`, 50 by default), `GET /api/users/id/:id` and `POST /api/users/email`.
 - Email OTP: sign in, verify an email, or reset a password with a one-time code.
 - Sign-up fraud protection (optional, set `FRAUD_CHECK_API_URL`):
   - The [DeGhost fraud detection API](https://deghost.hexbyte.dev) (endpoint <https://deghostapi.hexbyte.dev>) must allow the email, or the sign-up is blocked.

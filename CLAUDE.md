@@ -57,7 +57,7 @@ Drizzle ORM over `pg` Pool. `schema.ts` defines all tables with UUIDv7 primary k
 
 ### Internal user API (`src/routes/users.route.ts` + `src/services/user.service.ts`)
 
-A custom Basic-Auth-protected lookup API: `GET /api/users/id/:id` and `POST /api/users/email`. These routes are **conditionally mounted** in `index.ts`, only when both `API_AUTH_USER` and `API_AUTH_PASSWORD` are set (`isBasicAuthEnabled`). When disabled, the paths return 503. The service layer shapes responses through `UserResponseSchema` to avoid leaking sensitive columns (passwords, tokens); routes never return raw DB rows.
+A custom Basic-Auth-protected lookup API: `GET /api/users` (paged list, `limit`/`offset`), `GET /api/users/id/:id` and `POST /api/users/email`. These routes are **conditionally mounted** in `index.ts`, only when both `API_AUTH_USER` and `API_AUTH_PASSWORD` are set (`isBasicAuthEnabled`). When disabled, the paths return 503. The service layer shapes responses through `UserResponseSchema` to avoid leaking sensitive columns (passwords, tokens); routes never return raw DB rows.
 
 ### Middleware (`src/middleware/api-key.middleware.ts`)
 
