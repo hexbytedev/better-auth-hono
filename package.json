@@ -22,7 +22,7 @@
     "@better-auth/passkey": "^1.7.12",
     "@hono/zod-openapi": "^1.6.3",
     "@scalar/hono-api-reference": "^0.12.14",
-    "@sentry/bun": "^10.77.1",
+    "@sentry/bun": "^11.9.0",
     "better-auth": "^1.7.12",
     "dotenv": "^18.0.9",
     "drizzle-orm": "^0.45.4",
